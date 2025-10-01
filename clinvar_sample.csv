@@ -1,0 +1,5 @@
+gene,variant_id,protein_change,cdna_change,clinical_significance,condition,source
+BRCA1,VCV000123456.1,p.Val1736Ala,c.5207T>C,Pathogenic,Hereditary breast and ovarian cancer,ClinVar
+BRCA1,VCV000654321.3,p.Glu23Valfs,c.68_69del,Pathogenic,Hereditary breast and ovarian cancer,ClinVar
+BRCA2,VCV000987654.2,p.Ser1982Arg,c.5946G>A,Likely_pathogenic,Hereditary breast and ovarian cancer,ClinVar
+TP53,VCV000111111.1,p.Arg175His,c.524G>A,Pathogenic,Li-Fraumeni syndrome,ClinVar
