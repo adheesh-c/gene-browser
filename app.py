@@ -2,7 +2,16 @@ import os
 from pathlib import Path
 import pandas as pd
 import streamlit as st
-from rapidfuzz import process, fuzz
+try:
+    from rapidfuzz import process, fuzz
+    def fuzzy_gene_candidates(q, choices, limit=5):
+        matches = process.extract(q, choices, scorer=fuzz.WRatio, limit=limit)
+        return [m[0] for m in matches if m[1] > 60]
+except Exception:
+    # built-in fallback (slower)
+    from difflib import get_close_matches
+    def fuzzy_gene_candidates(q, choices, limit=5):
+        return get_close_matches(q, choices, n=limit, cutoff=0.6)
 
 DATA_PATH = Path(__file__).parent / "data" / "clinvar_sample.csv"
 
