@@ -13,7 +13,11 @@ except Exception:
     def fuzzy_gene_candidates(q, choices, limit=5):
         return get_close_matches(q, choices, n=limit, cutoff=0.6)
 
-DATA_PATH = "/Users/adheesh/Documents/gene-browser/data/clinvar_sample.csv"
+DATA_PATH = Path(__file__).parent / "data" / "clinvar_sample.csv"
+
+st.write("CWD:", Path.cwd())
+st.write("Expected data path:", DATA_PATH)
+st.write("File exists?", DATA_PATH.exists())
 
 # ---------- Page config ----------
 st.set_page_config(page_title="Gene → Mutations", page_icon="🧬", layout="wide")
