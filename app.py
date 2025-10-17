@@ -13,7 +13,7 @@ except Exception:
     def fuzzy_gene_candidates(q, choices, limit=5):
         return get_close_matches(q, choices, n=limit, cutoff=0.6)
 
-DATA_PATH = "clinvar_sample.csv"
+DATA_PATH = "/Users/adheesh/Documents/gene-browser/data/clinvar_sample.csv"
 
 # ---------- Page config ----------
 st.set_page_config(page_title="Gene → Mutations", page_icon="🧬", layout="wide")
@@ -34,7 +34,7 @@ def load_variants(csv_path: Path) -> pd.DataFrame:
         df["gene"] = df["gene"].astype(str).str.strip().str.upper()
     return df
 
-variants_df = load_variants(DATA_PATH)
+variants_df = pd.read_csv(DATA_PATH)
 
 # ---------- Sidebar (filters & info) ----------
 with st.sidebar:
