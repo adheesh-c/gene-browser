@@ -15,9 +15,9 @@ except Exception:
 
 DATA_PATH = Path(__file__).parent / "clinvar_sample.csv"
 
-st.write("CWD:", Path.cwd())
-st.write("Expected data path:", DATA_PATH)
-st.write("File exists?", DATA_PATH.exists())
+# st.write("CWD:", Path.cwd())
+# st.write("Expected data path:", DATA_PATH)
+# st.write("File exists?", DATA_PATH.exists())
 
 # ---------- Page config ----------
 st.set_page_config(page_title="Gene → Mutations", page_icon="🧬", layout="wide")
@@ -131,12 +131,12 @@ elif query:
     )
 
 # ---------- Footer helpers ----------
-with st.expander("How to plug in real ClinVar / NCBI"):
-    st.markdown("""
-- Replace `data/clinvar_sample.csv` with an export from ClinVar or your ETL.
-- Keep column names similar (gene, variant_id, protein_change, cdna_change, clinical_significance, condition, source).
-- For performance on large data:
-  - Use **parquet** instead of CSV and load with `pd.read_parquet`.
-  - Add `@st.cache_data` to any expensive loaders or API calls.
-  - Consider pre-indexing by gene into per-gene Parquet files.
-""")
+# with st.expander("How to plug in real ClinVar / NCBI"):
+#     st.markdown("""
+# - Replace `data/clinvar_sample.csv` with an export from ClinVar or your ETL.
+# - Keep column names similar (gene, variant_id, protein_change, cdna_change, clinical_significance, condition, source).
+# - For performance on large data:
+#   - Use **parquet** instead of CSV and load with `pd.read_parquet`.
+#   - Add `@st.cache_data` to any expensive loaders or API calls.
+#   - Consider pre-indexing by gene into per-gene Parquet files.
+# """)
