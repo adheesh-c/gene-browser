@@ -13,7 +13,152 @@ except Exception:
     def fuzzy_gene_candidates(q, choices, limit=5):
         return get_close_matches(q, choices, n=limit, cutoff=0.6)
 
+# --- NEW IMPORTS ---
+import time, re, os
+from typing import Optional, Tuple, List
+import requests
+
+# (optional) add your email in Streamlit secrets to be a good API citizen with NCBI:
+# .streamlit/secrets.toml -> NCBI_EMAIL="you@example.com"
+NCBI_TOOL = "gene-browser"
+NCBI_EMAIL = st.secrets.get("NCBI_EMAIL", "")
+
+# --- Column name candidates seen in ClinVar dumps ---
+POSSIBLE_GENE_COLS   = ["GeneSymbol","GeneSymbol;HGNC_ID","GENE","gene","SYMBOL","Symbol"]
+POSSIBLE_DISEASE_COLS= ["PhenotypeList","Phenotype","Condition(s)","ConditionList","DiseaseName","Condition","Disease","PHENOTYPE"]
+POSSIBLE_PMID_COLS   = ["PubMedIDs","PUBMED_IDS","PMIDs","PMID","pubmed_id"]
+POSSIBLE_NAME_COLS   = ["Name","VariantName","VARIANT_NAME"]
+POSSIBLE_HGVSC_COLS  = ["HGVSc","HGVS_cDNA","HGVS_c","hgvs_c"]
+POSSIBLE_HGVSP_COLS  = ["HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange"]
+
+def _pick_first(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
+    for c in candidates:
+        if c in df.columns: return c
+    return None
+
+def _normalize_gene(x: str) -> str:
+    return str(x).strip().upper()
+
+def _extract_mutation_codes(row) -> Tuple[Optional[str], Optional[str]]:
+    cdna = None
+    prot = None
+    for c in POSSIBLE_HGVSC_COLS:
+        if c in row and pd.notna(row[c]) and str(row[c]).strip():
+            cdna = str(row[c]).strip(); break
+    for c in POSSIBLE_HGVSP_COLS:
+        if c in row and pd.notna(row[c]) and str(row[c]).strip():
+            prot = str(row[c]).strip(); break
+    if cdna is None or prot is None:
+        name_col = next((c for c in POSSIBLE_NAME_COLS if c in row), None)
+        name_val = str(row[name_col]).strip() if (name_col and pd.notna(row[name_col])) else ""
+        if cdna is None:
+            m = re.search(r"(c\.[^ \),;]+)", name_val)
+            if m: cdna = m.group(1)
+        if prot is None:
+            m = re.search(r"\(?(p\.[A-Za-z][^)\s]+)\)?", name_val)
+            if m: prot = m.group(1)
+    return cdna, prot
+
+def _extract_first_disease(row) -> Optional[str]:
+    for c in POSSIBLE_DISEASE_COLS:
+        if c in row and pd.notna(row[c]):
+            txt = str(row[c]).strip()
+            if not txt: continue
+            parts = re.split(r"[;|,]", txt)
+            for p in parts:
+                p2 = p.strip()
+                if p2 and p2.lower() not in {"not provided","not specified"}:
+                    return p2
+    return None
+
+def _first_pmid(row) -> Optional[str]:
+    for c in POSSIBLE_PMID_COLS:
+        if c in row and pd.notna(row[c]):
+            raw = str(row[c]).strip()
+            ids = re.split(r"[;,|\s]+", raw)
+            for pm in ids:
+                pm2 = pm.strip()
+                if pm2.isdigit(): return pm2
+    return None
+
+@st.cache_data(ttl=60*60, show_spinner=False)
+def _pubmed_one_sentence(pmid: str) -> Optional[str]:
+    if not pmid: return None
+    params = {"db":"pubmed","id":pmid,"rettype":"abstract","retmode":"text"}
+    if NCBI_TOOL: params["tool"] = NCBI_TOOL
+    if NCBI_EMAIL: params["email"] = NCBI_EMAIL
+    try:
+        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+                         params=params, timeout=10)
+        r.raise_for_status()
+        text = r.text.strip()
+        if not text: return None
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if not lines: return None
+        para = lines[0] if len(lines[0].split())>=6 else (lines[1] if len(lines)>1 else lines[0])
+        sent = re.split(r"(?<=[.!?])\s+", para)[0].strip()
+        return sent or None
+    except Exception:
+        return None
+
+def _fallback_sentence(gene: str, cdna: Optional[str], prot: Optional[str],
+                       disease: Optional[str], significance: Optional[str]) -> str:
+    bits = []
+    if gene: bits.append(gene)
+    if cdna or prot: bits.append(f"variant {(cdna or prot)}")
+    if disease: bits.append(f"is associated with {disease}")
+    if significance and str(significance).strip(): bits.append(f"({significance})")
+    txt = " ".join(bits).strip()
+    if not txt: txt = "Variant associated information not available."
+    if not txt.endswith("."): txt += "."
+    return txt
+
+def build_variant_cards(df: pd.DataFrame, gene: str, n: int = 3) -> List[dict]:
+    gene = _normalize_gene(gene)
+    df = df.copy()
+    df.columns = [c.strip() for c in df.columns]
+
+    gene_col = _pick_first(df, POSSIBLE_GENE_COLS)
+    sig_col  = next((c for c in ["ClinicalSignificance","clinical_significance","CLNSIG","Significance","CLIN_SIG"] if c in df.columns), None)
+    name_col = _pick_first(df, POSSIBLE_NAME_COLS)
+
+    if gene_col:
+        df["_gene_norm"] = df[gene_col].fillna("").map(_normalize_gene)
+        hits = df[df["_gene_norm"] == gene]
+    else:
+        hits = df
+
+    if hits.empty and name_col:
+        mask = df[name_col].fillna("").str.contains(rf"\({re.escape(gene)}\)", na=False, regex=True)
+        hits = df[mask]
+
+    hits = hits.head(max(1, n))
+    cards = []
+    for _, row in hits.iterrows():
+        cdna, prot = _extract_mutation_codes(row)
+        disease = _extract_first_disease(row)
+        pmid = _first_pmid(row)
+        significance = row.get(sig_col, None)
+
+        summary = _pubmed_one_sentence(pmid) if pmid else None
+        # be polite to NCBI when not serving from cache
+        if pmid and summary is None: time.sleep(0.35)
+        if not summary or len(summary.split()) < 5:
+            summary = _fallback_sentence(gene, cdna, prot, disease, significance)
+
+        mut_label = cdna or prot or (row.get(name_col, "Unspecified variant"))
+        cards.append({
+            "Mutation": mut_label,
+            "Disease/Phenotype": disease or "Not specified",
+            "Clinical significance": (significance if pd.notna(significance) else "Not specified"),
+            "PMID": pmid or "—",
+            "Summary": summary
+        })
+    return cards
+
 DATA_PATH = Path(__file__).parent / "clinvar_sample.csv"
+
+
 
 # st.write("CWD:", Path.cwd())
 # st.write("Expected data path:", DATA_PATH)
@@ -26,10 +171,15 @@ st.set_page_config(page_title="Gene → Mutations", page_icon="🧬", layout="wi
 @st.cache_data(show_spinner=False)
 def load_variants(csv_path: Path) -> pd.DataFrame:
     if not csv_path.exists():
+        st.error(f"Data file not found: {csv_path}")
+        st.stop()
         # Fallback empty frame with expected columns
         cols = ["gene","variant_id","protein_change","cdna_change",
                 "clinical_significance","condition","source"]
         return pd.DataFrame(columns=cols)
+    if csv_path.suffix.lower() in {".tsv", ".txt"}:
+        return pd.read_csv(csv_path, sep="\t", dtype=str, low_memory=False)
+    return pd.read_csv(csv_path, dtype=str, low_memory=False)
     df = pd.read_csv(csv_path)
     # Normalize column names for safety
     df.columns = [c.strip().lower() for c in df.columns]
@@ -38,7 +188,7 @@ def load_variants(csv_path: Path) -> pd.DataFrame:
         df["gene"] = df["gene"].astype(str).str.strip().str.upper()
     return df
 
-variants_df = pd.read_csv(DATA_PATH)
+variants_df = load_variants(DATA_PATH)
 
 # ---------- Sidebar (filters & info) ----------
 with st.sidebar:
@@ -130,6 +280,26 @@ elif query:
         mime="text/csv",
     )
 
+if query and not results.empty:
+    with st.expander("🧬 Variant cards (beta)", expanded=True):
+        cols = st.columns([1, 6, 2])
+        with cols[0]:
+            n_cards = st.number_input("How many", min_value=1, max_value=5, value=3, step=1)
+        with cols[1]:
+            st.caption("Top variants for this gene, with phenotype and a one-sentence summary.")
+        with cols[2]:
+            go = st.button("Generate cards")
+
+        if go:
+            cards = build_variant_cards(variants_df, query, n=int(n_cards))
+            for i, c in enumerate(cards, 1):
+                st.markdown("---")
+                st.markdown(f"**Variant {i}: {c['Mutation']}**")
+                st.markdown(f"- **Disease/Phenotype:** {c['Disease/Phenotype']}")
+                st.markdown(f"- **Clinical significance:** {c['Clinical significance']}")
+                if c["PMID"] != "—":
+                    st.markdown(f"- **PMID:** {c['PMID']} (PubMed)")
+                st.markdown(f"> {c['Summary']}")
 # ---------- Footer helpers ----------
 # with st.expander("How to plug in real ClinVar / NCBI"):
 #     st.markdown("""
