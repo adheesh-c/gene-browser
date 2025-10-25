@@ -17,8 +17,11 @@ import time, re, os
 from typing import Optional, Tuple, List
 import requests
 
-# (optional) add your email in Streamlit secrets to be a good API citizen with NCBI:
-# .streamlit/secrets.toml -> NCBI_EMAIL="you@example.com"
+# Identify likely ClinVar column names
+POSSIBLE_PMID_COLS = ["PubMedIDs", "PUBMED_IDS", "PMIDs", "PMID", "pubmed_id"]
+POSSIBLE_NAME_COLS = ["Name", "VariantName", "VARIANT_NAME"]  # optional for mutation label
+
+# NCBI etiquette
 NCBI_TOOL = "gene-browser"
 NCBI_EMAIL = st.secrets.get("NCBI_EMAIL", "")
 
@@ -112,48 +115,80 @@ def _fallback_sentence(gene: str, cdna: Optional[str], prot: Optional[str],
     if not txt.endswith("."): txt += "."
     return txt
 
-def build_variant_cards(df: pd.DataFrame, gene: str, n: int = 3) -> List[dict]:
-    gene = _normalize_gene(gene)
+def build_variant_cards(df: pd.DataFrame, gene: str, n: int = 3) -> list[dict]:
+    """Return up to n cards with mutation label, disease, significance, PMID, and one-sentence summary."""
+    gene_norm = str(gene).strip().upper()
     df = df.copy()
     df.columns = [c.strip() for c in df.columns]
 
-    gene_col = _pick_first(df, POSSIBLE_GENE_COLS)
+    # Columns we might use for display
     sig_col  = next((c for c in ["ClinicalSignificance","clinical_significance","CLNSIG","Significance","CLIN_SIG"] if c in df.columns), None)
-    name_col = _pick_first(df, POSSIBLE_NAME_COLS)
+    name_col = next((c for c in ["HGVSc","HGVS_cDNA","HGVS_c","hgvs_c","HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange"] if c in df.columns), None)
+    if not name_col:
+        name_col = next((c for c in POSSIBLE_NAME_COLS if c in df.columns), None)
 
+    # Preferred gene column(s)
+    gene_col = next((c for c in ["GeneSymbol","GENE","gene","SYMBOL","Symbol","GeneSymbol;HGNC_ID"] if c in df.columns), None)
+
+    # Filter by gene
     if gene_col:
-        df["_gene_norm"] = df[gene_col].fillna("").map(_normalize_gene)
-        hits = df[df["_gene_norm"] == gene]
+        df["_gene_norm"] = df[gene_col].fillna("").map(lambda x: str(x).strip().upper())
+        hits = df[df["_gene_norm"] == gene_norm]
     else:
         hits = df
 
-    if hits.empty and name_col:
-        mask = df[name_col].fillna("").str.contains(rf"\({re.escape(gene)}\)", na=False, regex=True)
+    # Fallback: match (GENE) in "Name" field if no direct gene column matched
+    if hits.empty and "Name" in df.columns:
+        mask = df["Name"].fillna("").str.contains(rf"\({re.escape(gene_norm)}\)", regex=True, na=False)
         hits = df[mask]
 
+    # Take top n rows (you can sort by significance/date if you prefer)
     hits = hits.head(max(1, n))
+
     cards = []
     for _, row in hits.iterrows():
-        cdna, prot = _extract_mutation_codes(row)
-        disease = _extract_first_disease(row)
-        pmid = _first_pmid(row)
-        significance = row.get(sig_col, None)
+        # Mutation label preference: cDNA, then protein, then Name as fallback
+        mut_label = None
+        for c in ["HGVSc","HGVS_cDNA","HGVS_c","hgvs_c","HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange"]:
+            if c in row and pd.notna(row[c]) and str(row[c]).strip():
+                mut_label = str(row[c]).strip()
+                break
+        if not mut_label and name_col and pd.notna(row.get(name_col)):
+            mut_label = str(row[name_col]).strip()
 
-        summary = _pubmed_one_sentence(pmid) if pmid else None
-        # be polite to NCBI when not serving from cache
-        if pmid and summary is None: time.sleep(0.35)
+        # Disease/phenotype (first from a list-like column set)
+        disease = None
+        for c in ["PhenotypeList","Phenotype","Condition(s)","ConditionList","DiseaseName","Condition","Disease","PHENOTYPE"]:
+            if c in row and pd.notna(row[c]):
+                raw = str(row[c]).strip()
+                if raw:
+                    first = re.split(r"[;,\|]", raw)[0].strip()
+                    if first and first.lower() not in {"not provided","not specified"}:
+                        disease = first
+                        break
+
+        significance = str(row.get(sig_col, "") or "").strip() if sig_col else ""
+
+        # --- NEW: PubMed one-sentence summary ---
+        pmid = _parse_first_pmid(row)
+        summary = _pubmed_first_sentence(pmid) if pmid else None
+        # Be polite to NCBI if we actually hit the API (cache prevents most calls)
+        if pmid and summary is None:
+            time.sleep(0.35)
+
         if not summary or len(summary.split()) < 5:
-            summary = _fallback_sentence(gene, cdna, prot, disease, significance)
+            summary = _fallback_sentence(gene_norm, mut_label, disease, significance)
 
-        mut_label = cdna or prot or (row.get(name_col, "Unspecified variant"))
         cards.append({
-            "Mutation": mut_label,
+            "Mutation": mut_label or "Unspecified variant",
             "Disease/Phenotype": disease or "Not specified",
-            "Clinical significance": (significance if pd.notna(significance) else "Not specified"),
+            "Clinical significance": significance or "Not specified",
             "PMID": pmid or "—",
-            "Summary": summary
+            "Summary": summary,
         })
+
     return cards
+
 
 DATA_PATH = Path(__file__).parent / "clinvar_sample.csv"
 
@@ -188,6 +223,70 @@ def load_variants(csv_path: Path) -> pd.DataFrame:
     return df
 
 variants_df = load_variants(DATA_PATH)
+
+def _parse_first_pmid(row) -> str | None:
+    """Extract the first numeric PMID from any of the usual ClinVar PMID columns."""
+    for col in POSSIBLE_PMID_COLS:
+        if col in row and pd.notna(row[col]):
+            raw = str(row[col]).strip()
+            if not raw:
+                continue
+            # Split on semicolons, commas, pipes, whitespace
+            for pm in re.split(r"[;,\|\s]+", raw):
+                pm = pm.strip()
+                if pm.isdigit():
+                    return pm
+    return None
+
+@st.cache_data(ttl=60*60, show_spinner=False)
+def _pubmed_first_sentence(pmid: str) -> str | None:
+    """Fetch PubMed abstract (text mode) and return a single first sentence."""
+    if not pmid:
+        return None
+    params = {"db": "pubmed", "id": pmid, "rettype": "abstract", "retmode": "text"}
+    if NCBI_TOOL:
+        params["tool"] = NCBI_TOOL
+    if NCBI_EMAIL:
+        params["email"] = NCBI_EMAIL
+
+    try:
+        r = requests.get(
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+            params=params,
+            timeout=10,
+        )
+        r.raise_for_status()
+        text = r.text.strip()
+        if not text:
+            return None
+
+        # Find a content-y line (skip headers). If first line is very short, try next.
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if not lines:
+            return None
+        para = lines[0] if len(lines[0].split()) >= 6 else (lines[1] if len(lines) > 1 else lines[0])
+
+        # Naive sentence split; good enough for a one-liner
+        sent = re.split(r"(?<=[.!?])\s+", para)[0].strip()
+        return sent or None
+
+    except Exception:
+        # Keep the UI resilient if PubMed fails
+        return None
+
+def _fallback_sentence(gene: str, mutation_label: str | None, disease: str | None, significance: str | None) -> str:
+    bits = []
+    if gene: bits.append(gene)
+    if mutation_label: bits.append(f"variant {mutation_label}")
+    if disease: bits.append(f"is associated with {disease}")
+    if significance and str(significance).strip(): bits.append(f"({significance})")
+    txt = " ".join(bits).strip()
+    if not txt:
+        txt = "Variant associated information not available."
+    if not txt.endswith("."):
+        txt += "."
+    return txt
+
 
 # ---------- Sidebar (filters & info) ----------
 with st.sidebar:
@@ -299,6 +398,25 @@ if query and not results.empty:
                 if c["PMID"] != "—":
                     st.markdown(f"- **PMID:** {c['PMID']} (PubMed)")
                 st.markdown(f"> {c['Summary']}")
+
+if query and not results.empty:
+    with st.expander("🧬 Variant cards with PubMed summary", expanded=True):
+        left, right = st.columns([1, 5])
+        with left:
+            n_cards = st.number_input("How many", min_value=1, max_value=5, value=3, step=1)
+        with right:
+            st.caption("Each card includes a one-sentence summary extracted from PubMed when available.")
+        if st.button("Generate cards"):
+            cards = build_variant_cards(variants_df, query, n=int(n_cards))
+            for i, c in enumerate(cards, 1):
+                st.markdown("---")
+                st.markdown(f"**Variant {i}: {c['Mutation']}**")
+                st.markdown(f"- **Disease/Phenotype:** {c['Disease/Phenotype']}")
+                st.markdown(f"- **Clinical significance:** {c['Clinical significance']}")
+                if c["PMID"] != "—":
+                    st.markdown(f"- **PMID:** [{c['PMID']}](https://pubmed.ncbi.nlm.nih.gov/{c['PMID']}/)")
+                st.markdown(f"> {c['Summary']}")
+
 # ---------- Footer helpers ----------
 # with st.expander("How to plug in real ClinVar / NCBI"):
 #     st.markdown("""
