@@ -378,26 +378,6 @@ elif query:
         mime="text/csv",
     )
 
-if query and not results.empty:
-    with st.expander("🧬 Variant cards (beta)", expanded=True):
-        cols = st.columns([1, 6, 2])
-        with cols[0]:
-            n_cards = st.number_input("How many", min_value=1, max_value=5, value=3, step=1)
-        with cols[1]:
-            st.caption("Top variants for this gene, with phenotype and a one-sentence summary.")
-        with cols[2]:
-            go = st.button("Generate cards")
-
-        if go:
-            cards = build_variant_cards(variants_df, query, n=int(n_cards))
-            for i, c in enumerate(cards, 1):
-                st.markdown("---")
-                st.markdown(f"**Variant {i}: {c['Mutation']}**")
-                st.markdown(f"- **Disease/Phenotype:** {c['Disease/Phenotype']}")
-                st.markdown(f"- **Clinical significance:** {c['Clinical significance']}")
-                if c["PMID"] != "—":
-                    st.markdown(f"- **PMID:** {c['PMID']} (PubMed)")
-                st.markdown(f"> {c['Summary']}")
 
 if query and not results.empty:
     with st.expander("🧬 Variant cards with PubMed summary", expanded=True):
