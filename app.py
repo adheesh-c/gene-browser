@@ -272,87 +272,89 @@ def load_variants(csv_path: Path) -> pd.DataFrame:
         df["gene"] = df["gene"].astype(str).str.strip().str.upper()
     return df
 
+# --- PMID parsing from dataset ---
 def _parse_first_pmid(row) -> str | None:
-    """Extract the first numeric PMID from any of the usual ClinVar PMID columns."""
     for col in POSSIBLE_PMID_COLS:
         if col in row and pd.notna(row[col]):
             raw = str(row[col]).strip()
             if not raw:
                 continue
-            # Split on semicolons, commas, pipes, whitespace
             for pm in re.split(r"[;,\|\s]+", raw):
                 pm = pm.strip()
                 if pm.isdigit():
                     return pm
     return None
 
+# --- Pull first sentence from PubMed abstract ---
 @st.cache_data(ttl=60*60, show_spinner=False)
-def _pubmed_first_sentence(pmid: str) -> str | None:
-    """Fetch PubMed abstract (text mode) and return a single first sentence."""
+def _pubmed_one_sentence(pmid: str) -> str | None:
     if not pmid:
         return None
     params = {"db": "pubmed", "id": pmid, "rettype": "abstract", "retmode": "text"}
-    if NCBI_TOOL:
-        params["tool"] = NCBI_TOOL
-    if NCBI_EMAIL:
-        params["email"] = NCBI_EMAIL
-
+    if NCBI_TOOL: params["tool"] = NCBI_TOOL
+    if NCBI_EMAIL: params["email"] = NCBI_EMAIL
     try:
-        r = requests.get(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
-            params=params,
-            timeout=10,
-        )
+        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+                         params=params, timeout=10)
         r.raise_for_status()
         text = r.text.strip()
         if not text:
             return None
-
-        # Find a content-y line (skip headers). If first line is very short, try next.
         lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
         if not lines:
             return None
         para = lines[0] if len(lines[0].split()) >= 6 else (lines[1] if len(lines) > 1 else lines[0])
-
-        # Naive sentence split; good enough for a one-liner
         sent = re.split(r"(?<=[.!?])\s+", para)[0].strip()
         return sent or None
-
     except Exception:
-        # Keep the UI resilient if PubMed fails
         return None
 
+# --- Guess a PMID if the CSV doesn't have one ---
+@st.cache_data(ttl=60*60, show_spinner=False)
+def _guess_pmid(gene: str | None, mutation: str | None, disease: str | None) -> str | None:
+    gene = (gene or "").strip()
+    mutation = (mutation or "").strip()
+    disease = (disease or "").strip()
+    terms = [t for t in [gene, mutation, disease] if t]
+    if not terms:
+        return None
+    q = " ".join(terms)
+    params = {"db": "pubmed", "retmode": "json", "retmax": "1", "term": q}
+    if NCBI_TOOL: params["tool"] = NCBI_TOOL
+    if NCBI_EMAIL: params["email"] = NCBI_EMAIL
+    try:
+        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+                         params=params, timeout=10)
+        r.raise_for_status()
+        ids = r.json().get("esearchresult", {}).get("idlist", [])
+        return ids[0] if ids else None
+    except Exception:
+        return None
+
+# --- NEW: Attach a PMID column to your dataframe (manual or guessed) ---
 @st.cache_data(ttl=60*60, show_spinner=False)
 def attach_pmids(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-    if "PMID" in df.columns:
-        return df  # already has it
+    """
+    Returns a copy of df with a 'PMID' column added if missing.
+    Uses any existing PMID in the row; otherwise tries to guess via PubMed.
+    """
+    if "PMID" in df.columns:  # already there
+        return df.copy()
 
-    # Hand-curated seeds for your 4 demo rows (edit/extend later)
-    manual = {
-        ("BRCA1","c.5207T>C","p.Val1736Ala"): "23269703",
-        ("BRCA1","c.68_69del","p.Glu23Valfs"): "7550349",
-        # If the BRCA2 row is actually 6174delT:
-        ("BRCA2","c.5946delT","p.Ser1982Argfs*22"): "8673091",
-        ("TP53","c.524G>A","p.Arg175His"): "8164043",
-    }
-
-    pmids = []
+    out_rows = []
     for _, r in df.iterrows():
-        key = (str(r.get("gene","")).strip().upper(),
-               str(r.get("cdna_change","")).strip(),
-               str(r.get("protein_change","")).strip())
-        pmid = manual.get(key)
+        pmid = _parse_first_pmid(r)
         if not pmid:
-            # Try to guess via ESearch using gene+mutation+disease
             pmid = _guess_pmid(
                 gene=str(r.get("gene","")),
                 mutation=str(r.get("cdna_change") or r.get("protein_change") or ""),
                 disease=str(r.get("condition",""))
-            ) or ""
-        pmids.append(pmid)
-    df["PMID"] = pmids
-    return df
+            )
+        rr = r.copy()
+        rr["PMID"] = pmid or ""
+        out_rows.append(rr)
+    return pd.DataFrame(out_rows)
+
 
 variants_df = load_variants(DATA_PATH)
 variants_df = attach_pmids(variants_df)
