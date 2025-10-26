@@ -107,7 +107,7 @@ def _pubmed_one_sentence(pmid: str) -> Optional[str]:
 def _guess_pmid(gene: str | None, mutation: str | None, disease: str | None) -> str | None:
     """
     If the dataset has no PMID, try to find one via PubMed ESearch using gene + mutation/disease.
-    Returns a single PMID (string) or None.
+    Returns a single PMID or None.
     """
     gene = (gene or "").strip()
     mutation = (mutation or "").strip()
@@ -116,7 +116,6 @@ def _guess_pmid(gene: str | None, mutation: str | None, disease: str | None) -> 
     if not terms:
         return None
 
-    # Simple query like: "BRCA1 c.68_69del Hereditary breast and ovarian cancer"
     q = " ".join(terms)
     params = {"db": "pubmed", "retmode": "json", "retmax": "1", "term": q}
     if NCBI_TOOL: params["tool"] = NCBI_TOOL
@@ -126,8 +125,7 @@ def _guess_pmid(gene: str | None, mutation: str | None, disease: str | None) -> 
         r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
                          params=params, timeout=10)
         r.raise_for_status()
-        data = r.json()
-        ids = data.get("esearchresult", {}).get("idlist", [])
+        ids = r.json().get("esearchresult", {}).get("idlist", [])
         return ids[0] if ids else None
     except Exception:
         return None
@@ -202,7 +200,7 @@ def build_variant_cards(df: pd.DataFrame, gene: str, n: int = 3) -> list[dict]:
         # --- NEW: PubMed one-sentence summary ---
         pmid = _parse_first_pmid(row)
 
-        # If the row has no PMID, try to guess one from PubMed using gene+mutation+disease
+        # If row lacks a PMID, try to guess one from PubMed using gene+mutation+disease
         if not pmid:
             pmid = _guess_pmid(gene_norm, mut_label, disease)
 
@@ -211,6 +209,7 @@ def build_variant_cards(df: pd.DataFrame, gene: str, n: int = 3) -> list[dict]:
         # Be polite to NCBI if we actually hit the API (cache prevents most calls)
         if pmid and summary is None:
             time.sleep(0.35)
+
 
 
         if not summary or len(summary.split()) < 5:
@@ -274,6 +273,7 @@ def load_variants(csv_path: Path) -> pd.DataFrame:
     return df
 
 variants_df = load_variants(DATA_PATH)
+variants_df = attach_pmids(variants_df)
 
 def canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Create stable, lower-case columns your UI expects, regardless of ClinVar header variants."""
@@ -528,7 +528,7 @@ elif query:
                       "clinical_significance", "condition", "source"]
     ordered_cols = [c for c in preferred_cols if c in results.columns] + \
                    [c for c in results.columns if c not in preferred_cols]
-    st.dataframe(results[ordered_cols], use_container_width=True, hide_index=True)
+    st.dataframe(results[ordered_cols], width="stretch", hide_index=True)
 
     # Download button
     csv_bytes = results[ordered_cols].to_csv(index=False).encode("utf-8")
