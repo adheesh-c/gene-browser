@@ -272,53 +272,6 @@ def load_variants(csv_path: Path) -> pd.DataFrame:
         df["gene"] = df["gene"].astype(str).str.strip().str.upper()
     return df
 
-variants_df = load_variants(DATA_PATH)
-variants_df = attach_pmids(variants_df)
-
-def canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Create stable, lower-case columns your UI expects, regardless of ClinVar header variants."""
-    df = df.copy()
-    df.columns = [c.strip() for c in df.columns]
-
-    # gene → create 'gene'
-    gene_col = _pick_first(df, ["gene", "GENE", "GeneSymbol", "SYMBOL", "Symbol", "GeneSymbol;HGNC_ID"])
-    if gene_col:
-        df["gene"] = df[gene_col].fillna("").map(_normalize_gene)
-
-    # clinical_significance → create 'clinical_significance'
-    sig_col = _pick_first(df, ["clinical_significance","ClinicalSignificance","CLNSIG","Significance","CLIN_SIG"])
-    if sig_col and "clinical_significance" not in df.columns:
-        df["clinical_significance"] = df[sig_col]
-
-    # condition/phenotype → create 'condition'
-    cond_col = _pick_first(df, POSSIBLE_DISEASE_COLS)
-    if cond_col and "condition" not in df.columns:
-        df["condition"] = df[cond_col]
-
-    # variant_id (optional)
-    vid_col = _pick_first(df, ["VariantID","variant_id","VariationID","VCV","VCV_ID"])
-    if vid_col and "variant_id" not in df.columns:
-        df["variant_id"] = df[vid_col]
-
-    # protein change → create 'protein_change'
-    prot_col = _pick_first(df, ["protein_change","HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange"])
-    if prot_col and "protein_change" not in df.columns:
-        df["protein_change"] = df[prot_col]
-
-    # cDNA change → create 'cdna_change'
-    cdna_col = _pick_first(df, ["cdna_change","HGVSc","HGVS_cDNA","HGVS_c","hgvs_c"])
-    if cdna_col and "cdna_change" not in df.columns:
-        df["cdna_change"] = df[cdna_col]
-
-    # source (optional)
-    if "source" not in df.columns:
-        df["source"] = "ClinVar"
-
-    return df
-
-variants_df = canonicalize_columns(variants_df)
-
-
 def _parse_first_pmid(row) -> str | None:
     """Extract the first numeric PMID from any of the usual ClinVar PMID columns."""
     for col in POSSIBLE_PMID_COLS:
@@ -400,6 +353,53 @@ def attach_pmids(df: pd.DataFrame) -> pd.DataFrame:
         pmids.append(pmid)
     df["PMID"] = pmids
     return df
+
+variants_df = load_variants(DATA_PATH)
+variants_df = attach_pmids(variants_df)
+
+def canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Create stable, lower-case columns your UI expects, regardless of ClinVar header variants."""
+    df = df.copy()
+    df.columns = [c.strip() for c in df.columns]
+
+    # gene → create 'gene'
+    gene_col = _pick_first(df, ["gene", "GENE", "GeneSymbol", "SYMBOL", "Symbol", "GeneSymbol;HGNC_ID"])
+    if gene_col:
+        df["gene"] = df[gene_col].fillna("").map(_normalize_gene)
+
+    # clinical_significance → create 'clinical_significance'
+    sig_col = _pick_first(df, ["clinical_significance","ClinicalSignificance","CLNSIG","Significance","CLIN_SIG"])
+    if sig_col and "clinical_significance" not in df.columns:
+        df["clinical_significance"] = df[sig_col]
+
+    # condition/phenotype → create 'condition'
+    cond_col = _pick_first(df, POSSIBLE_DISEASE_COLS)
+    if cond_col and "condition" not in df.columns:
+        df["condition"] = df[cond_col]
+
+    # variant_id (optional)
+    vid_col = _pick_first(df, ["VariantID","variant_id","VariationID","VCV","VCV_ID"])
+    if vid_col and "variant_id" not in df.columns:
+        df["variant_id"] = df[vid_col]
+
+    # protein change → create 'protein_change'
+    prot_col = _pick_first(df, ["protein_change","HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange"])
+    if prot_col and "protein_change" not in df.columns:
+        df["protein_change"] = df[prot_col]
+
+    # cDNA change → create 'cdna_change'
+    cdna_col = _pick_first(df, ["cdna_change","HGVSc","HGVS_cDNA","HGVS_c","hgvs_c"])
+    if cdna_col and "cdna_change" not in df.columns:
+        df["cdna_change"] = df[cdna_col]
+
+    # source (optional)
+    if "source" not in df.columns:
+        df["source"] = "ClinVar"
+
+    return df
+
+variants_df = canonicalize_columns(variants_df)
+
 
 
 def _fallback_sentence(gene: str, mutation_label: str | None, disease: str | None, significance: str | None) -> str:
