@@ -224,6 +224,50 @@ def load_variants(csv_path: Path) -> pd.DataFrame:
 
 variants_df = load_variants(DATA_PATH)
 
+def canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Create stable, lower-case columns your UI expects, regardless of ClinVar header variants."""
+    df = df.copy()
+    df.columns = [c.strip() for c in df.columns]
+
+    # gene → create 'gene'
+    gene_col = _pick_first(df, ["gene", "GENE", "GeneSymbol", "SYMBOL", "Symbol", "GeneSymbol;HGNC_ID"])
+    if gene_col:
+        df["gene"] = df[gene_col].fillna("").map(_normalize_gene)
+
+    # clinical_significance → create 'clinical_significance'
+    sig_col = _pick_first(df, ["clinical_significance","ClinicalSignificance","CLNSIG","Significance","CLIN_SIG"])
+    if sig_col and "clinical_significance" not in df.columns:
+        df["clinical_significance"] = df[sig_col]
+
+    # condition/phenotype → create 'condition'
+    cond_col = _pick_first(df, POSSIBLE_DISEASE_COLS)
+    if cond_col and "condition" not in df.columns:
+        df["condition"] = df[cond_col]
+
+    # variant_id (optional)
+    vid_col = _pick_first(df, ["VariantID","variant_id","VariationID","VCV","VCV_ID"])
+    if vid_col and "variant_id" not in df.columns:
+        df["variant_id"] = df[vid_col]
+
+    # protein change → create 'protein_change'
+    prot_col = _pick_first(df, ["protein_change","HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange"])
+    if prot_col and "protein_change" not in df.columns:
+        df["protein_change"] = df[prot_col]
+
+    # cDNA change → create 'cdna_change'
+    cdna_col = _pick_first(df, ["cdna_change","HGVSc","HGVS_cDNA","HGVS_c","hgvs_c"])
+    if cdna_col and "cdna_change" not in df.columns:
+        df["cdna_change"] = df[cdna_col]
+
+    # source (optional)
+    if "source" not in df.columns:
+        df["source"] = "ClinVar"
+
+    return df
+
+variants_df = canonicalize_columns(variants_df)
+
+
 def _parse_first_pmid(row) -> str | None:
     """Extract the first numeric PMID from any of the usual ClinVar PMID columns."""
     for col in POSSIBLE_PMID_COLS:
@@ -291,16 +335,16 @@ def _fallback_sentence(gene: str, mutation_label: str | None, disease: str | Non
 # ---------- Sidebar (filters & info) ----------
 with st.sidebar:
     st.header("Filters")
-    # Precompute options
-    gene_options = sorted(variants_df["gene"].dropna().unique().tolist())
-    sig_options = sorted(variants_df["clinical_significance"].dropna().unique().tolist())
-    cond_options = sorted(variants_df["condition"].dropna().unique().tolist())
+    gene_options = sorted(variants_df["gene"].dropna().unique().tolist()) if "gene" in variants_df.columns else []
+    sig_options = sorted(variants_df["clinical_significance"].dropna().unique().tolist()) if "clinical_significance" in variants_df.columns else []
+    cond_options = sorted(variants_df["condition"].dropna().unique().tolist()) if "condition" in variants_df.columns else []
 
     selected_sigs = st.multiselect("Clinical significance", options=sig_options, default=[])
     selected_conditions = st.multiselect("Condition", options=cond_options, default=[])
 
     st.markdown("---")
-    st.caption("Data source: sample CSV (swap with ClinVar export/API later).")
+    st.caption("Data source: ClinVar subset. PubMed summaries via NCBI E-utilities.")
+
 
 # ---------- Title & search ----------
 st.title("🧬 Gene → Related Mutations")
@@ -313,17 +357,24 @@ with col2:
     topk = st.number_input("Max results", min_value=5, max_value=5000, value=200, step=5)
 
 # ---------- Autocomplete / fuzzy help ----------
-def fuzzy_gene_candidates(user_text: str, choices: list[str], limit: int = 5):
-    if not user_text or not choices:
-        return []
-    # RapidFuzz returns (match, score, index)
-    matches = process.extract(user_text, choices, scorer=fuzz.WRatio, limit=limit)
-    return [m[0] for m in matches if m[1] > 60]  # simple threshold
+# def fuzzy_gene_candidates(user_text: str, choices: list[str], limit: int = 5):
+#     if not user_text or not choices:
+#         return []
+#     # RapidFuzz returns (match, score, index)
+#     matches = process.extract(user_text, choices, scorer=fuzz.WRatio, limit=limit)
+#     return [m[0] for m in matches if m[1] > 60]  # simple threshold
 
 if query and (query not in variants_df["gene"].unique()):
     suggestions = fuzzy_gene_candidates(query, gene_options, limit=5)
     if suggestions:
-        st.info(f"Did you mean: {', '.join(suggestions)}")
+        st.info("Did you mean:")
+        cols = st.columns(len(suggestions))
+        for i, s in enumerate(suggestions):
+            if cols[i].button(s):
+                st.session_state["__query_override"] = s
+
+# apply override if user clicked a suggestion
+query = st.session_state.get("__query_override", query)
 
 # ---------- Filtering logic ----------
 def filter_variants(df: pd.DataFrame, gene_text: str) -> pd.DataFrame:
