@@ -103,6 +103,36 @@ def _pubmed_one_sentence(pmid: str) -> Optional[str]:
     except Exception:
         return None
 
+@st.cache_data(ttl=60*60, show_spinner=False)
+def _guess_pmid(gene: str | None, mutation: str | None, disease: str | None) -> str | None:
+    """
+    If the dataset has no PMID, try to find one via PubMed ESearch using gene + mutation/disease.
+    Returns a single PMID (string) or None.
+    """
+    gene = (gene or "").strip()
+    mutation = (mutation or "").strip()
+    disease = (disease or "").strip()
+    terms = [t for t in [gene, mutation, disease] if t]
+    if not terms:
+        return None
+
+    # Simple query like: "BRCA1 c.68_69del Hereditary breast and ovarian cancer"
+    q = " ".join(terms)
+    params = {"db": "pubmed", "retmode": "json", "retmax": "1", "term": q}
+    if NCBI_TOOL: params["tool"] = NCBI_TOOL
+    if NCBI_EMAIL: params["email"] = NCBI_EMAIL
+
+    try:
+        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+                         params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        ids = data.get("esearchresult", {}).get("idlist", [])
+        return ids[0] if ids else None
+    except Exception:
+        return None
+
+
 def _fallback_sentence(gene: str, cdna: Optional[str], prot: Optional[str],
                        disease: Optional[str], significance: Optional[str]) -> str:
     bits = []
@@ -171,10 +201,17 @@ def build_variant_cards(df: pd.DataFrame, gene: str, n: int = 3) -> list[dict]:
 
         # --- NEW: PubMed one-sentence summary ---
         pmid = _parse_first_pmid(row)
-        summary = _pubmed_first_sentence(pmid) if pmid else None
+
+        # If the row has no PMID, try to guess one from PubMed using gene+mutation+disease
+        if not pmid:
+            pmid = _guess_pmid(gene_norm, mut_label, disease)
+
+        summary = _pubmed_one_sentence(pmid) if pmid else None
+
         # Be polite to NCBI if we actually hit the API (cache prevents most calls)
         if pmid and summary is None:
             time.sleep(0.35)
+
 
         if not summary or len(summary.split()) < 5:
             summary = _fallback_sentence(gene_norm, mut_label, disease, significance)
@@ -200,6 +237,20 @@ DATA_PATH = Path(__file__).parent / "clinvar_sample.csv"
 
 # ---------- Page config ----------
 st.set_page_config(page_title="Gene → Mutations", page_icon="🧬", layout="wide")
+
+st.markdown("""
+<style>
+.hero {
+  padding: 2rem; border-radius: 16px;
+  background: linear-gradient(180deg, #f5f6ff 0%, #ffffff 100%);
+  border: 1px solid #e9ecff;
+}
+.hero h1 { margin: 0 0 0.5rem 0; }
+.badge { display:inline-block; padding:0.25rem 0.6rem; border-radius:999px; background:#eef2ff; margin-right:0.4rem; }
+.kidcard { border:1px solid #e6e8ff; border-radius:14px; padding:1rem; background:#fafbff; }
+</style>
+""", unsafe_allow_html=True)
+
 
 # ---------- Caching ----------
 @st.cache_data(show_spinner=False)
@@ -318,6 +369,39 @@ def _pubmed_first_sentence(pmid: str) -> str | None:
         # Keep the UI resilient if PubMed fails
         return None
 
+@st.cache_data(ttl=60*60, show_spinner=False)
+def attach_pmids(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    if "PMID" in df.columns:
+        return df  # already has it
+
+    # Hand-curated seeds for your 4 demo rows (edit/extend later)
+    manual = {
+        ("BRCA1","c.5207T>C","p.Val1736Ala"): "23269703",
+        ("BRCA1","c.68_69del","p.Glu23Valfs"): "7550349",
+        # If the BRCA2 row is actually 6174delT:
+        ("BRCA2","c.5946delT","p.Ser1982Argfs*22"): "8673091",
+        ("TP53","c.524G>A","p.Arg175His"): "8164043",
+    }
+
+    pmids = []
+    for _, r in df.iterrows():
+        key = (str(r.get("gene","")).strip().upper(),
+               str(r.get("cdna_change","")).strip(),
+               str(r.get("protein_change","")).strip())
+        pmid = manual.get(key)
+        if not pmid:
+            # Try to guess via ESearch using gene+mutation+disease
+            pmid = _guess_pmid(
+                gene=str(r.get("gene","")),
+                mutation=str(r.get("cdna_change") or r.get("protein_change") or ""),
+                disease=str(r.get("condition",""))
+            ) or ""
+        pmids.append(pmid)
+    df["PMID"] = pmids
+    return df
+
+
 def _fallback_sentence(gene: str, mutation_label: str | None, disease: str | None, significance: str | None) -> str:
     bits = []
     if gene: bits.append(gene)
@@ -355,6 +439,32 @@ with col1:
     query = st.text_input("Gene symbol", value="", placeholder="e.g., BRCA1, TP53, BRCA2").strip().upper()
 with col2:
     topk = st.number_input("Max results", min_value=5, max_value=5000, value=200, step=5)
+
+# Teen-friendly landing when no query yet
+if not query:
+    st.markdown('<div class="hero">', unsafe_allow_html=True)
+    st.markdown("## 🧬 Welcome to the Gene Variant Explorer")
+    st.write("Type a gene (like **BRCA1**) to see real variants, the conditions they’re linked to, and a one-sentence research summary from PubMed.")
+    st.write("Use these quick-picks to try it:")
+    cols = st.columns(5)
+    picks = ["BRCA1", "BRCA2", "TP53", "APC", "MLH1"]
+    for i, g in enumerate(picks):
+        if cols[i].button(g):
+            st.session_state["__query_override"] = g
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    with st.expander("What’s a gene? What’s a variant? (Simple explanations)"):
+        st.markdown("""
+- **Gene:** an instruction in your DNA that helps your cells work (like a recipe).
+- **Variant (mutation):** a small change in that instruction. Some are harmless, some matter for health.
+- **Why look?** Understanding common variants can guide better health conversations with doctors.
+*This app is for learning only — not medical advice.*
+        """)
+
+# Apply quick-pick override
+query = st.session_state.get("__query_override", query)
+
 
 # ---------- Autocomplete / fuzzy help ----------
 # def fuzzy_gene_candidates(user_text: str, choices: list[str], limit: int = 5):
