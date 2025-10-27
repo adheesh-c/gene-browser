@@ -84,51 +84,77 @@ def _first_pmid(row) -> Optional[str]:
     return None
 
 @st.cache_data(ttl=60*60, show_spinner=False)
-def _pubmed_one_sentence(pmid: str) -> Optional[str]:
-    if not pmid: return None
-    params = {"db":"pubmed","id":pmid,"rettype":"abstract","retmode":"text"}
+def _pubmed_one_sentence(pmid: str) -> str | None:
+    """
+    Return first sentence from PubMed abstract using XML (more reliable than text mode).
+    """
+    if not pmid:
+        return None
+    params = {"db": "pubmed", "id": pmid, "retmode": "xml"}
     if NCBI_TOOL: params["tool"] = NCBI_TOOL
     if NCBI_EMAIL: params["email"] = NCBI_EMAIL
+
     try:
         r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
                          params=params, timeout=10)
         r.raise_for_status()
-        text = r.text.strip()
-        if not text: return None
-        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-        if not lines: return None
-        para = lines[0] if len(lines[0].split())>=6 else (lines[1] if len(lines)>1 else lines[0])
-        sent = re.split(r"(?<=[.!?])\s+", para)[0].strip()
+        from xml.etree import ElementTree as ET
+        root = ET.fromstring(r.text)
+
+        # PubmedArticleSet/PubmedArticle/MedlineCitation/Article/Abstract/AbstractText
+        texts = []
+        for node in root.findall(".//Abstract/AbstractText"):
+            # AbstractText may have Label attr, text content possibly split
+            part = (node.text or "").strip()
+            if part:
+                texts.append(part)
+        abstract = " ".join(texts).strip()
+
+        if not abstract:
+            return None
+
+        # naive sentence split
+        import re as _re
+        sent = _re.split(r"(?<=[.!?])\s+", abstract)[0].strip()
         return sent or None
     except Exception:
         return None
 
+
 @st.cache_data(ttl=60*60, show_spinner=False)
 def _guess_pmid(gene: str | None, mutation: str | None, disease: str | None) -> str | None:
     """
-    If the dataset has no PMID, try to find one via PubMed ESearch using gene + mutation/disease.
-    Returns a single PMID or None.
+    Try multiple PubMed ESearch queries to find a relevant PMID.
+    Priority: gene + mutation, then gene + disease, then gene only.
     """
-    gene = (gene or "").strip()
-    mutation = (mutation or "").strip()
-    disease = (disease or "").strip()
-    terms = [t for t in [gene, mutation, disease] if t]
-    if not terms:
-        return None
+    g = (gene or "").strip()
+    m = (mutation or "").strip()
+    d = (disease or "").strip()
 
-    q = " ".join(terms)
-    params = {"db": "pubmed", "retmode": "json", "retmax": "1", "term": q}
-    if NCBI_TOOL: params["tool"] = NCBI_TOOL
-    if NCBI_EMAIL: params["email"] = NCBI_EMAIL
+    queries = []
+    if g and m:
+        # Try to anchor on title/abstract for relevance
+        queries.append(f'{g}[Title/Abstract] AND ("{m}"[All Fields])')
+    if g and d:
+        queries.append(f'{g}[Title/Abstract] AND ("{d}"[Title/Abstract])')
+    if g:
+        queries.append(f'{g}[Title/Abstract]')
 
-    try:
-        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-                         params=params, timeout=10)
-        r.raise_for_status()
-        ids = r.json().get("esearchresult", {}).get("idlist", [])
-        return ids[0] if ids else None
-    except Exception:
-        return None
+    for q in queries:
+        params = {"db": "pubmed", "retmode": "json", "retmax": "1", "sort": "relevance", "term": q}
+        if NCBI_TOOL: params["tool"] = NCBI_TOOL
+        if NCBI_EMAIL: params["email"] = NCBI_EMAIL
+        try:
+            r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+                             params=params, timeout=10)
+            r.raise_for_status()
+            ids = r.json().get("esearchresult", {}).get("idlist", [])
+            if ids:
+                return ids[0]
+        except Exception:
+            continue
+    return None
+
 
 
 def _fallback_sentence(gene: str, cdna: Optional[str], prot: Optional[str],
@@ -199,16 +225,19 @@ def build_variant_cards(df: pd.DataFrame, gene: str, n: int = 3) -> list[dict]:
 
         # --- NEW: PubMed one-sentence summary ---
         pmid = _parse_first_pmid(row)
-
-        # If row lacks a PMID, try to guess one from PubMed using gene+mutation+disease
+        
         if not pmid:
             pmid = _guess_pmid(gene_norm, mut_label, disease)
 
         summary = _pubmed_one_sentence(pmid) if pmid else None
 
-        # Be polite to NCBI if we actually hit the API (cache prevents most calls)
+        # Be polite to NCBI if we actually hit the API and got nothing (will be cached on future calls)
         if pmid and summary is None:
             time.sleep(0.35)
+
+        if not summary or len(summary.split()) < 5:
+            summary = _fallback_sentence(gene_norm, mut_label, disease, significance)
+
 
 
 
@@ -285,51 +314,6 @@ def _parse_first_pmid(row) -> str | None:
                     return pm
     return None
 
-# --- Pull first sentence from PubMed abstract ---
-@st.cache_data(ttl=60*60, show_spinner=False)
-def _pubmed_one_sentence(pmid: str) -> str | None:
-    if not pmid:
-        return None
-    params = {"db": "pubmed", "id": pmid, "rettype": "abstract", "retmode": "text"}
-    if NCBI_TOOL: params["tool"] = NCBI_TOOL
-    if NCBI_EMAIL: params["email"] = NCBI_EMAIL
-    try:
-        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
-                         params=params, timeout=10)
-        r.raise_for_status()
-        text = r.text.strip()
-        if not text:
-            return None
-        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-        if not lines:
-            return None
-        para = lines[0] if len(lines[0].split()) >= 6 else (lines[1] if len(lines) > 1 else lines[0])
-        sent = re.split(r"(?<=[.!?])\s+", para)[0].strip()
-        return sent or None
-    except Exception:
-        return None
-
-# --- Guess a PMID if the CSV doesn't have one ---
-@st.cache_data(ttl=60*60, show_spinner=False)
-def _guess_pmid(gene: str | None, mutation: str | None, disease: str | None) -> str | None:
-    gene = (gene or "").strip()
-    mutation = (mutation or "").strip()
-    disease = (disease or "").strip()
-    terms = [t for t in [gene, mutation, disease] if t]
-    if not terms:
-        return None
-    q = " ".join(terms)
-    params = {"db": "pubmed", "retmode": "json", "retmax": "1", "term": q}
-    if NCBI_TOOL: params["tool"] = NCBI_TOOL
-    if NCBI_EMAIL: params["email"] = NCBI_EMAIL
-    try:
-        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-                         params=params, timeout=10)
-        r.raise_for_status()
-        ids = r.json().get("esearchresult", {}).get("idlist", [])
-        return ids[0] if ids else None
-    except Exception:
-        return None
 
 # --- NEW: Attach a PMID column to your dataframe (manual or guessed) ---
 @st.cache_data(ttl=60*60, show_spinner=False)
@@ -558,7 +542,31 @@ if query and not results.empty:
                 st.markdown(f"- **Clinical significance:** {c['Clinical significance']}")
                 if c["PMID"] != "—":
                     st.markdown(f"- **PMID:** [{c['PMID']}](https://pubmed.ncbi.nlm.nih.gov/{c['PMID']}/)")
+                else:
+                    st.caption("No PMID in dataset; attempted PubMed search.")
                 st.markdown(f"> {c['Summary']}")
+
+            with st.expander("Diagnostics (why you might not see a one-liner)"):
+                st.write("Showing up to the first 5 candidate rows with their derived PubMed info.")
+                import itertools
+                diag_rows = []
+                # build again but keep pmid + raw query ingredients
+                sample_hits = results.head(min(len(results), 5))
+                for _, row in sample_hits.iterrows():
+                    gene_norm = (query or "").strip().upper()
+                    mut = str(row.get("cdna_change") or row.get("protein_change") or row.get("Name") or "")
+                    dis = str(row.get("condition") or row.get("Phenotype") or "")
+                    pmid = row.get("PMID", "") or _parse_first_pmid(row) or _guess_pmid(gene_norm, mut, dis) or ""
+                    summary = _pubmed_one_sentence(pmid) if pmid else ""
+                    diag_rows.append({
+                        "gene": gene_norm,
+                        "mutation": mut,
+                        "disease": dis,
+                        "pmid": pmid,
+                        "summary_len": len(summary.split()) if summary else 0
+                    })
+                st.dataframe(pd.DataFrame(diag_rows), width="stretch", hide_index=True)
+
 
 # ---------- Footer helpers ----------
 # with st.expander("How to plug in real ClinVar / NCBI"):
