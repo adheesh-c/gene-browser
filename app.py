@@ -26,12 +26,82 @@ NCBI_TOOL = "gene-browser"
 NCBI_EMAIL = st.secrets.get("NCBI_EMAIL", "")
 
 # --- Column name candidates seen in ClinVar dumps ---
-POSSIBLE_GENE_COLS   = ["GeneSymbol","GeneSymbol;HGNC_ID","GENE","gene","SYMBOL","Symbol"]
-POSSIBLE_DISEASE_COLS= ["PhenotypeList","Phenotype","Condition(s)","ConditionList","DiseaseName","Condition","Disease","PHENOTYPE"]
-POSSIBLE_PMID_COLS   = ["PubMedIDs","PUBMED_IDS","PMIDs","PMID","pubmed_id"]
-POSSIBLE_NAME_COLS   = ["Name","VariantName","VARIANT_NAME"]
-POSSIBLE_HGVSC_COLS  = ["HGVSc","HGVS_cDNA","HGVS_c","hgvs_c"]
-POSSIBLE_HGVSP_COLS  = ["HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange"]
+# --- Column name candidates seen in ClinVar dumps + your CSV ---
+POSSIBLE_GENE_COLS    = ["GeneSymbol","GeneSymbol;HGNC_ID","GENE","gene","SYMBOL","Symbol"]
+POSSIBLE_DISEASE_COLS = ["PhenotypeList","Phenotype","Condition(s)","ConditionList","DiseaseName",
+                         "Condition","Disease","PHENOTYPE","condition","disease","phenotype"]
+POSSIBLE_PMID_COLS    = ["PubMedIDs","PUBMED_IDS","PMIDs","PMID","pubmed_id","pmid"]
+POSSIBLE_NAME_COLS    = ["Name","VariantName","VARIANT_NAME"]
+# Include your CSV's field names here ↓↓↓
+POSSIBLE_HGVSC_COLS   = ["HGVSc","HGVS_cDNA","HGVS_c","hgvs_c","cdna_change"]
+POSSIBLE_HGVSP_COLS   = ["HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange","protein_change"]
+
+
+# ---------- PubMed helpers (robust) ----------
+@st.cache_data(ttl=60*60, show_spinner=False)
+def _pubmed_one_sentence(pmid: str) -> str | None:
+    """
+    Return first sentence from PubMed abstract using XML (more reliable than text mode).
+    """
+    if not pmid:
+        return None
+    params = {"db": "pubmed", "id": pmid, "retmode": "xml"}
+    if NCBI_TOOL: params["tool"] = NCBI_TOOL
+    if NCBI_EMAIL: params["email"] = NCBI_EMAIL
+
+    try:
+        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+                         params=params, timeout=10)
+        r.raise_for_status()
+        from xml.etree import ElementTree as ET
+        root = ET.fromstring(r.text)
+        texts = []
+        for node in root.findall(".//Abstract/AbstractText"):
+            part = (node.text or "").strip()
+            if part:
+                texts.append(part)
+        abstract = " ".join(texts).strip()
+        if not abstract:
+            return None
+        import re as _re
+        sent = _re.split(r"(?<=[.!?])\s+", abstract)[0].strip()
+        return sent or None
+    except Exception:
+        return None
+
+@st.cache_data(ttl=60*60, show_spinner=False)
+def _guess_pmid(gene: str | None, mutation: str | None, disease: str | None) -> str | None:
+    """
+    Try multiple PubMed ESearch queries to find a relevant PMID.
+    Priority: gene + mutation, then gene + disease, then gene only.
+    """
+    g = (gene or "").strip()
+    m = (mutation or "").strip()
+    d = (disease or "").strip()
+
+    queries = []
+    if g and m:
+        queries.append(f'{g}[Title/Abstract] AND ("{m}"[All Fields])')
+    if g and d:
+        queries.append(f'{g}[Title/Abstract] AND ("{d}"[Title/Abstract])')
+    if g:
+        queries.append(f'{g}[Title/Abstract]')
+
+    for q in queries:
+        params = {"db": "pubmed", "retmode": "json", "retmax": "1", "sort": "relevance", "term": q}
+        if NCBI_TOOL: params["tool"] = NCBI_TOOL
+        if NCBI_EMAIL: params["email"] = NCBI_EMAIL
+        try:
+            r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+                             params=params, timeout=10)
+            r.raise_for_status()
+            ids = r.json().get("esearchresult", {}).get("idlist", [])
+            if ids:
+                return ids[0]
+        except Exception:
+            pass
+    return None
+
 
 def _pick_first(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
     for c in candidates:
@@ -65,13 +135,15 @@ def _extract_first_disease(row) -> Optional[str]:
     for c in POSSIBLE_DISEASE_COLS:
         if c in row and pd.notna(row[c]):
             txt = str(row[c]).strip()
-            if not txt: continue
+            if not txt:
+                continue
             parts = re.split(r"[;|,]", txt)
             for p in parts:
                 p2 = p.strip()
-                if p2 and p2.lower() not in {"not provided","not specified"}:
+                if p2 and p2.lower() not in {"not provided","not specified","na","n/a"}:
                     return p2
     return None
+
 
 def _first_pmid(row) -> Optional[str]:
     for c in POSSIBLE_PMID_COLS:
@@ -82,79 +154,6 @@ def _first_pmid(row) -> Optional[str]:
                 pm2 = pm.strip()
                 if pm2.isdigit(): return pm2
     return None
-
-@st.cache_data(ttl=60*60, show_spinner=False)
-def _pubmed_one_sentence(pmid: str) -> str | None:
-    """
-    Return first sentence from PubMed abstract using XML (more reliable than text mode).
-    """
-    if not pmid:
-        return None
-    params = {"db": "pubmed", "id": pmid, "retmode": "xml"}
-    if NCBI_TOOL: params["tool"] = NCBI_TOOL
-    if NCBI_EMAIL: params["email"] = NCBI_EMAIL
-
-    try:
-        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
-                         params=params, timeout=10)
-        r.raise_for_status()
-        from xml.etree import ElementTree as ET
-        root = ET.fromstring(r.text)
-
-        # PubmedArticleSet/PubmedArticle/MedlineCitation/Article/Abstract/AbstractText
-        texts = []
-        for node in root.findall(".//Abstract/AbstractText"):
-            # AbstractText may have Label attr, text content possibly split
-            part = (node.text or "").strip()
-            if part:
-                texts.append(part)
-        abstract = " ".join(texts).strip()
-
-        if not abstract:
-            return None
-
-        # naive sentence split
-        import re as _re
-        sent = _re.split(r"(?<=[.!?])\s+", abstract)[0].strip()
-        return sent or None
-    except Exception:
-        return None
-
-
-@st.cache_data(ttl=60*60, show_spinner=False)
-def _guess_pmid(gene: str | None, mutation: str | None, disease: str | None) -> str | None:
-    """
-    Try multiple PubMed ESearch queries to find a relevant PMID.
-    Priority: gene + mutation, then gene + disease, then gene only.
-    """
-    g = (gene or "").strip()
-    m = (mutation or "").strip()
-    d = (disease or "").strip()
-
-    queries = []
-    if g and m:
-        # Try to anchor on title/abstract for relevance
-        queries.append(f'{g}[Title/Abstract] AND ("{m}"[All Fields])')
-    if g and d:
-        queries.append(f'{g}[Title/Abstract] AND ("{d}"[Title/Abstract])')
-    if g:
-        queries.append(f'{g}[Title/Abstract]')
-
-    for q in queries:
-        params = {"db": "pubmed", "retmode": "json", "retmax": "1", "sort": "relevance", "term": q}
-        if NCBI_TOOL: params["tool"] = NCBI_TOOL
-        if NCBI_EMAIL: params["email"] = NCBI_EMAIL
-        try:
-            r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-                             params=params, timeout=10)
-            r.raise_for_status()
-            ids = r.json().get("esearchresult", {}).get("idlist", [])
-            if ids:
-                return ids[0]
-        except Exception:
-            continue
-    return None
-
 
 
 def _fallback_sentence(gene: str, cdna: Optional[str], prot: Optional[str],
@@ -201,14 +200,16 @@ def build_variant_cards(df: pd.DataFrame, gene: str, n: int = 3) -> list[dict]:
 
     cards = []
     for _, row in hits.iterrows():
-        # Mutation label preference: cDNA, then protein, then Name as fallback
+        # Mutation label preference: cDNA, then protein, then Name as fallback (includes your CSV fields)
         mut_label = None
-        for c in ["HGVSc","HGVS_cDNA","HGVS_c","hgvs_c","HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange"]:
+        for c in ["cdna_change","HGVSc","HGVS_cDNA","HGVS_c","hgvs_c",
+                  "protein_change","HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange"]:
             if c in row and pd.notna(row[c]) and str(row[c]).strip():
                 mut_label = str(row[c]).strip()
                 break
         if not mut_label and name_col and pd.notna(row.get(name_col)):
             mut_label = str(row[name_col]).strip()
+
 
         # Disease/phenotype (first from a list-like column set)
         disease = None
@@ -385,21 +386,6 @@ def canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 variants_df = canonicalize_columns(variants_df)
-
-
-
-def _fallback_sentence(gene: str, mutation_label: str | None, disease: str | None, significance: str | None) -> str:
-    bits = []
-    if gene: bits.append(gene)
-    if mutation_label: bits.append(f"variant {mutation_label}")
-    if disease: bits.append(f"is associated with {disease}")
-    if significance and str(significance).strip(): bits.append(f"({significance})")
-    txt = " ".join(bits).strip()
-    if not txt:
-        txt = "Variant associated information not available."
-    if not txt.endswith("."):
-        txt += "."
-    return txt
 
 
 # ---------- Sidebar (filters & info) ----------
