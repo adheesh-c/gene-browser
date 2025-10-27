@@ -16,6 +16,19 @@ except Exception:
 import time, re, os
 from typing import Optional, Tuple, List
 import requests
+from datetime import datetime
+
+def _get_param_list(key):
+    val = st.query_params.get(key, "")
+    if isinstance(val, list): return val
+    if not val: return []
+    return val.split("|")
+
+def _set_params(gene: str, sigs: list[str], conds: list[str]):
+    st.query_params["gene"] = gene or ""
+    st.query_params["sig"]  = "|".join(sigs) if sigs else ""
+    st.query_params["cond"] = "|".join(conds) if conds else ""
+
 
 # Identify likely ClinVar column names
 POSSIBLE_PMID_COLS = ["PubMedIDs", "PUBMED_IDS", "PMIDs", "PMID", "pubmed_id"]
@@ -267,6 +280,21 @@ DATA_PATH = Path(__file__).parent / "clinvar_sample.csv"
 # ---------- Page config ----------
 st.set_page_config(page_title="Gene → Mutations", page_icon="🧬", layout="wide")
 
+# ---- URL/state init (must come before using `query` anywhere) ----
+if "loaded_params" not in st.session_state:
+    st.session_state["loaded_params"] = True
+    st.session_state["query"] = st.query_params.get("gene", "").upper()
+    st.session_state["selected_sigs"] = []
+    st.session_state["selected_conditions"] = []
+    # prefill from URL if present
+    sig_from_url = st.query_params.get("sig", "")
+    cond_from_url = st.query_params.get("cond", "")
+    if sig_from_url:
+        st.session_state["selected_sigs"] = sig_from_url.split("|")
+    if cond_from_url:
+        st.session_state["selected_conditions"] = cond_from_url.split("|")
+
+
 st.markdown("""
 <style>
 .hero {
@@ -391,26 +419,74 @@ variants_df = canonicalize_columns(variants_df)
 # ---------- Sidebar (filters & info) ----------
 with st.sidebar:
     st.header("Filters")
+
     gene_options = sorted(variants_df["gene"].dropna().unique().tolist()) if "gene" in variants_df.columns else []
-    sig_options = sorted(variants_df["clinical_significance"].dropna().unique().tolist()) if "clinical_significance" in variants_df.columns else []
+    sig_options  = sorted(variants_df["clinical_significance"].dropna().unique().tolist()) if "clinical_significance" in variants_df.columns else []
     cond_options = sorted(variants_df["condition"].dropna().unique().tolist()) if "condition" in variants_df.columns else []
 
-    selected_sigs = st.multiselect("Clinical significance", options=sig_options, default=[])
-    selected_conditions = st.multiselect("Condition", options=cond_options, default=[])
+    selected_sigs = st.multiselect(
+        "Clinical significance",
+        options=sig_options,
+        default=[s for s in st.session_state.get("selected_sigs", []) if s in sig_options],
+    )
+    selected_conditions = st.multiselect(
+        "Condition",
+        options=cond_options,
+        default=[c for c in st.session_state.get("selected_conditions", []) if c in cond_options],
+    )
+
+    # persist to state
+    st.session_state["selected_sigs"] = selected_sigs
+    st.session_state["selected_conditions"] = selected_conditions
+
+    # keep params in URL (safe because query is now state-backed)
+    _set_params(st.session_state.get("query",""), selected_sigs, selected_conditions)
 
     st.markdown("---")
     st.caption("Data source: ClinVar subset. PubMed summaries via NCBI E-utilities.")
 
-
 # ---------- Title & search ----------
-st.title("🧬 Gene → Related Mutations")
+st.title("🧬 Gene Variant Explorer")
+
+tabs = st.tabs(["Explore", "Learn", "About", "Feedback"])
+
+with tabs[0]:
+    st.write("Type a gene symbol (e.g., **BRCA1**) to see related variants. Use the sidebar to filter.")
+    # (keep your current Explore section code from here down to the cards/diagnostics)
+    st.markdown("#### Try your own file")
+    up = st.file_uploader("Upload a ClinVar-style CSV/TSV", type=["csv","tsv","txt"], help="We look for gene, cdna_change/protein_change, clinical_significance, condition, PMID (optional)")
+    if up is not None:
+        sep = "\t" if (up.name.endswith(".tsv") or up.name.endswith(".txt")) else ","
+        user_df = pd.read_csv(up, sep=sep, dtype=str, low_memory=False)
+        user_df = canonicalize_columns(user_df)
+        user_df = attach_pmids(user_df)
+        variants_df = user_df  # override global for the session
+        # update sidebar options
+        gene_options = sorted(variants_df["gene"].dropna().unique().tolist()) if "gene" in variants_df.columns else []
+        sig_options  = sorted(variants_df["clinical_significance"].dropna().unique().tolist()) if "clinical_significance" in variants_df.columns else []
+        cond_options = sorted(variants_df["condition"].dropna().unique().tolist()) if "condition" in variants_df.columns else []
+        st.success(f"Loaded {len(variants_df)} rows from your file.")
+
+
 st.write("Type a gene symbol (e.g., **BRCA1**) to see related variants. Use the sidebar to filter.")
 
 col1, col2 = st.columns([2,1])
 with col1:
-    query = st.text_input("Gene symbol", value="", placeholder="e.g., BRCA1, TP53, BRCA2").strip().upper()
+    query = st.text_input(
+        "Gene symbol",
+        value=st.session_state.get("query", ""),
+        placeholder="e.g., BRCA1, TP53, BRCA2"
+    ).strip().upper()
+    st.session_state["query"] = query  # keep state in sync
 with col2:
     topk = st.number_input("Max results", min_value=5, max_value=5000, value=200, step=5)
+
+# after user changes query, update URL too
+_set_params(st.session_state["query"], st.session_state.get("selected_sigs", []), st.session_state.get("selected_conditions", []))
+
+# from here on, use the state-backed value
+query = st.session_state["query"]
+
 
 # Teen-friendly landing when no query yet
 if not query:
@@ -491,6 +567,9 @@ with left:
 with right:
     st.metric("Unique conditions", results["condition"].nunique() if not results.empty else 0)
 
+st.code(str(st.query_params), language="text")
+st.button("Copy share link", on_click=lambda: st.toast("Link copied! Use your browser address bar."))
+
 # ---------- Table ----------
 if results.empty and query:
     st.warning("No variants found for that input and filters. Try removing filters or check the gene symbol.")
@@ -553,6 +632,51 @@ if query and not results.empty:
                     })
                 st.dataframe(pd.DataFrame(diag_rows), width="stretch", hide_index=True)
 
+
+with tabs[1]:
+    st.subheader("Learn")
+    st.markdown("""
+    **What is this?**  
+    A student-built tool that shows real gene variants from ClinVar and a one-sentence research blurb from PubMed.
+
+    **How to use it**
+    1. Enter a gene (like `BRCA1`).
+    2. Filter by clinical significance or condition.
+    3. Click **Generate cards** for a short, readable summary.
+    """)
+
+with tabs[2]:
+    st.subheader("About")
+    st.markdown("""
+    - **Purpose:** Make genetics feel understandable for teens and families.
+    - **Data:** ClinVar subset (CSV in this demo) + PubMed abstracts via NCBI E-utilities.
+    - **Privacy:** No personal/health data—just public variant info.
+    - **Disclaimer:** Educational only. Not medical advice.
+    """)
+
+with tabs[3]:
+    st.subheader("Feedback")
+    with st.form("feedback_form", clear_on_submit=True):
+        name = st.text_input("Your name (optional)")
+        role = st.selectbox("I am a...", ["Student", "Parent", "Teacher", "Other"])
+        msg  = st.text_area("What should we improve?")
+        submitted = st.form_submit_button("Send")
+    if submitted:
+        # simple local log; in production send to a Google Form or webhook
+        ts = datetime.utcnow().isoformat()
+        row = pd.DataFrame([{"timestamp": ts, "name": name, "role": role, "message": msg}])
+        # append to a CSV during the session; in Streamlit Cloud this is ephemeral
+        try:
+            log_path = Path("feedback_log.csv")
+            if log_path.exists():
+                row.to_csv(log_path, mode="a", header=False, index=False)
+            else:
+                row.to_csv(log_path, index=False)
+            st.success("Thanks! Your feedback was recorded.")
+        except Exception:
+            st.info("Thanks! (Local logging failed on this host, but your message was received.)")
+
+    st.caption("For schools who want to pilot this, email: hello@example.org")
 
 # ---------- Footer helpers ----------
 # with st.expander("How to plug in real ClinVar / NCBI"):
