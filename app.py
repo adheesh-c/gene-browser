@@ -399,12 +399,14 @@ def render_about():
     st.title("About")
     st.markdown("""
 ### Purpose
-Genetics information is often written for professionals. This app helps students and families explore variant evidence responsibly.
+Genetics information is often written for professionals and can be confusing for people with litte background in genetics. This app helps students and families explore variant evidence responsibly.
 
 ### What’s inside
 - Variant rows from a ClinVar-style file
 - PubMed summaries fetched via NCBI E-utilities
 - Shareable links that preserve filters
+
+###How to read genetics information
 
 ### Privacy
 This app does not collect personal health information.
@@ -414,9 +416,9 @@ This app does not collect personal health information.
 def render_impact():
     st.title("Impact")
     st.markdown("""
-This page is where you show proof that your project helped people.
+Show proof that your project helped people.
 
-### What to measure (examples)
+### What will be put
 - Number of users (visits)
 - Number of gene searches
 - CSV downloads
@@ -424,13 +426,12 @@ This page is where you show proof that your project helped people.
 - Workshops / presentations delivered
 - People reached
 
-### Your winter-break “impact plan” (simple)
+### Plan for impact
 1. Present it to one real group (club/class/library).
 2. Collect feedback with the Feedback tab.
 3. Improve the tool based on feedback.
 4. Report numbers here.
 """)
-    st.warning("Tip: admissions likes numbers + evidence more than fancy features.")
 
 
 def render_feedback():
@@ -632,3 +633,4 @@ elif current_page == "about":
     render_about()
 elif current_page == "feedback":
     render_feedback()
+
