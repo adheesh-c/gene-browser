@@ -366,6 +366,18 @@ def render_home():
     st.title("🧬 Gene Variant Explorer")
     st.markdown("<div class='smallmuted'>A student-built tool to make genetics understandable using real public scientific data.</div>", unsafe_allow_html=True)
 
+    # Add quick start guide
+    with st.expander("Quick Start Guide (First Time Users)", expanded=True):
+        st.markdown("""
+        1. **Click "Tool" in the navigation bar above**
+        2. **Try searching for "BRCA1"** - a well-studied gene
+        3. **Look at the results table** - each row is a different variant
+        4. **Click "Generate cards"** at the bottom to see easy-to-read summaries
+        5. **Use the sidebar filters** to narrow down results by disease or significance
+        
+        **Don't understand the terms?** Check out the "About" page for explanations!
+        """)
+
     st.markdown("""
 <div class="hero">
 <h3>What this tool does</h3>
@@ -399,14 +411,65 @@ def render_about():
     st.title("About")
     st.markdown("""
 ### Purpose
-Genetics information is often written for professionals and can be confusing for people with litte background in genetics. This app helps students and families explore variant evidence responsibly.
+Genetics information is often written for professionals and can be confusing for people with little background in genetics. This app helps students and families explore variant evidence responsibly.
 
-### What’s inside
+### What's inside
 - Variant rows from a ClinVar-style file
 - PubMed summaries fetched via NCBI E-utilities
 - Shareable links that preserve filters
 
-###How to read genetics information
+### How to read genetics information
+
+#### Understanding the table columns:
+- **Gene**: The gene symbol (e.g., BRCA1, TP53) - a section of DNA that contains instructions for making a protein
+- **Variant ID**: A unique identifier for this specific variant (like a serial number)
+- **Protein change** (p.Val1736Ala): Describes how the protein is changed
+  - Format: `p.OriginalAminoAcidPositionNewAminoAcid`
+  - Example: `p.Val1736Ala` means at position 1736, Valine (Val) was replaced with Alanine (Ala)
+  - Think of it like changing one letter in a word: "cat" → "bat"
+- **cDNA change** (c.5207T>C): Describes the DNA change in the coding sequence
+  - Format: `c.PositionOriginalBase>NewBase`
+  - Example: `c.5207T>C` means at position 5207, Thymine (T) was replaced with Cytosine (C)
+  - This is the DNA-level change that causes the protein change
+- **Clinical significance**: What this variant means for health
+  - **Pathogenic**: ⚠️ Known to cause disease
+  - **Likely Pathogenic**: ⚠️ Strongly suspected to cause disease
+  - **Benign**: ✅ Does not cause disease
+  - **Likely Benign**: ✅ Unlikely to cause disease
+  - **VUS (Variant of Uncertain Significance)**: ❓ Unknown effect - needs more research
+- **Condition**: The disease or health condition associated with this variant
+- **Source**: Where the data comes from (usually ClinVar, a NIH database)
+- **PMID**: Link to the research paper (PubMed ID) - click to read the original study
+
+#### Understanding variant notation:
+- **c.** = coding DNA sequence (the part that makes proteins)
+- **p.** = protein sequence (the actual protein building blocks)
+- **fs** = frameshift (shifts how the code is read, often causing major problems)
+- **del** = deletion (DNA was removed)
+- **ins** = insertion (DNA was added)
+- *** or Ter** = stop codon (protein stops being made early, usually problematic)
+
+#### Example: Understanding a variant
+**Example variant:** `p.Val1736Ala` in BRCA1
+
+**What this means:**
+- In the BRCA1 gene, at position 1736
+- The amino acid **Valine (Val)** was changed to **Alanine (Ala)**
+- This is like changing one letter in a word: "cat" → "bat"
+
+**Why it matters:**
+- This small change can affect how the protein works
+- If the protein doesn't work correctly, it may not protect against cancer
+- That's why this variant might be "Pathogenic" (disease-causing)
+
+### Glossary
+- **Gene**: A section of DNA that contains instructions for making a protein. Genes are like recipes in a cookbook.
+- **Variant**: A change in the DNA sequence. Like a typo in a recipe - sometimes it matters, sometimes it doesn't.
+- **Pathogenic**: A variant that causes disease. Think of it as a 'broken' gene that doesn't work correctly.
+- **Benign**: A variant that does NOT cause disease. The gene still works fine despite the change.
+- **VUS (Variant of Uncertain Significance)**: We don't know yet if this variant causes disease. More research is needed.
+- **BRCA1/BRCA2**: Genes that help repair DNA damage. Variants in these genes increase cancer risk.
+- **TP53**: Often called the "guardian of the genome" - helps prevent cancer by stopping damaged cells.
 
 ### Privacy
 This app does not collect personal health information.
@@ -470,11 +533,30 @@ def filter_variants(df: pd.DataFrame, gene_text: str) -> pd.DataFrame:
     contains = df[df["gene"].str.contains(gene_text, na=False)]
     return contains
 
+def color_significance(val):
+    """Helper function to color-code clinical significance values"""
+    if pd.isna(val):
+        return ''
+    val_str = str(val).lower()
+    if 'pathogenic' in val_str and 'likely' not in val_str:
+        return 'background-color: #ffebee'  # Light red
+    elif 'likely pathogenic' in val_str:
+        return 'background-color: #fff3e0'  # Light orange
+    elif 'benign' in val_str and 'likely' not in val_str:
+        return 'background-color: #e8f5e9'  # Light green
+    elif 'likely benign' in val_str:
+        return 'background-color: #f1f8e9'  # Light yellow-green
+    elif 'uncertain' in val_str or 'vus' in val_str:
+        return 'background-color: #f3e5f5'  # Light purple
+    return ''
+
 
 def render_tool():
     # Sidebar only on tool page
     with st.sidebar:
         st.header("Filters")
+        st.caption("Use these to narrow down your search results")
+        
         sig_options  = sorted(variants_df["clinical_significance"].dropna().unique().tolist()) if "clinical_significance" in variants_df.columns else []
         cond_options = sorted(variants_df["condition"].dropna().unique().tolist()) if "condition" in variants_df.columns else []
 
@@ -482,11 +564,13 @@ def render_tool():
             "Clinical significance",
             options=sig_options,
             default=[s for s in st.session_state.get("selected_sigs", []) if s in sig_options],
+            help="Filter by whether variants are disease-causing (Pathogenic) or not (Benign)"
         )
         selected_conditions = st.multiselect(
             "Condition",
             options=cond_options,
             default=[c for c in st.session_state.get("selected_conditions", []) if c in cond_options],
+            help="Filter by specific diseases or health conditions"
         )
 
         st.session_state["selected_sigs"] = selected_sigs
@@ -497,6 +581,37 @@ def render_tool():
 
     st.title("🧬 Gene Variant Explorer — Tool")
     st.write("Type a gene symbol (e.g., **BRCA1**) to see related variants. Use the sidebar to filter.")
+
+    # Add help section
+    with st.expander("📚 What do these terms mean?", expanded=False):
+        st.markdown("""
+        - **Protein change (p.Val1736Ala)**: How the protein building blocks are altered. The format shows which amino acid was changed at which position.
+        - **cDNA change (c.5207T>C)**: The DNA sequence change in the gene. Shows which DNA base was changed.
+        - **Clinical significance**: Whether this variant is known to cause disease
+          - **Pathogenic**: ⚠️ Disease-causing
+          - **Likely Pathogenic**: ⚠️ Strongly suspected to cause disease
+          - **Benign**: ✅ Not disease-causing
+          - **Likely Benign**: ✅ Unlikely to cause disease
+          - **VUS**: ❓ Unknown significance (needs more research)
+        - **PMID**: Research paper identifier - click to read the original study
+        """)
+        st.info("💡 For more detailed explanations, check out the **About** page!")
+
+    # Add example section
+    with st.expander("💡 Example: Understanding a variant", expanded=False):
+        st.markdown("""
+        **Example variant:** `p.Val1736Ala` in BRCA1
+        
+        **What this means:**
+        - In the BRCA1 gene, at position 1736
+        - The amino acid **Valine (Val)** was changed to **Alanine (Ala)**
+        - This is like changing one letter in a word: "cat" → "bat"
+        
+        **Why it matters:**
+        - This small change can affect how the protein works
+        - If the protein doesn't work correctly, it may not protect against cancer
+        - That's why this variant might be "Pathogenic" (disease-causing)
+        """)
 
     # File uploader (optional)
     st.markdown("#### Try your own file")
@@ -536,15 +651,30 @@ def render_tool():
     # Landing
     if not query:
         st.markdown('<div class="hero">', unsafe_allow_html=True)
-        st.markdown("## Welcome")
-        st.write("Try one of these:")
+        st.markdown("## Welcome!")
+        st.write("**New to genetics?** Start by searching for a well-known gene:")
+        
+        # Add descriptions for each gene
+        gene_descriptions = {
+            "BRCA1": "Breast cancer gene 1 - helps repair DNA",
+            "BRCA2": "Breast cancer gene 2 - also helps repair DNA", 
+            "TP53": "Tumor protein 53 - 'guardian of the genome'",
+            "APC": "Adenomatous polyposis coli - involved in colon cancer",
+            "MLH1": "DNA mismatch repair gene - helps fix DNA errors"
+        }
+        
         cols = st.columns(5)
         picks = ["BRCA1", "BRCA2", "TP53", "APC", "MLH1"]
         for i, g in enumerate(picks):
-            if cols[i].button(g, key=f"pick_{g}"):
-                st.session_state["query"] = g
-                _set_params_keep_page(g, st.session_state.get("selected_sigs", []), st.session_state.get("selected_conditions", []))
-                st.rerun()
+            with cols[i]:
+                if st.button(g, key=f"pick_{g}"):
+                    st.session_state["query"] = g
+                    _set_params_keep_page(g, st.session_state.get("selected_sigs", []), st.session_state.get("selected_conditions", []))
+                    st.rerun()
+                st.caption(gene_descriptions[g])
+        
+        st.markdown("---")
+        st.markdown("** Tip:** After searching, click 'Generate cards' to see easy-to-read summaries!")
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
@@ -586,10 +716,24 @@ def render_tool():
         st.warning("No variants found. Try removing filters or check the gene symbol.")
         return
 
+    st.markdown("""
+    **Understanding the results table:**
+    - Each row represents a different variant (change) in the gene
+    - Color coding: Red/Orange = disease-causing, Green = not disease-causing, Purple = unknown
+    - Click on PMID numbers to read the original research paper
+    - Use filters in the sidebar to narrow results
+    """)
+
     preferred_cols = ["gene", "variant_id", "protein_change", "cdna_change",
                       "clinical_significance", "condition", "source", "PMID"]
     ordered_cols = [c for c in preferred_cols if c in results.columns] + [c for c in results.columns if c not in preferred_cols]
-    st.dataframe(results[ordered_cols], width="stretch", hide_index=True)
+    
+    # Apply color coding to clinical significance column if it exists
+    if "clinical_significance" in ordered_cols:
+        styled_df = results[ordered_cols].style.applymap(color_significance, subset=['clinical_significance'])
+        st.dataframe(styled_df, width="stretch", hide_index=True)
+    else:
+        st.dataframe(results[ordered_cols], width="stretch", hide_index=True)
 
     csv_bytes = results[ordered_cols].to_csv(index=False).encode("utf-8")
     st.download_button(
@@ -612,13 +756,37 @@ def render_tool():
             for i, c in enumerate(cards, 1):
                 st.markdown("---")
                 st.markdown(f"**Variant {i}: {c['Mutation']}**")
+                
+                # Add explanation of mutation notation
+                if c['Mutation'].startswith('p.'):
+                    st.caption("💡 'p.' means this describes a change in the protein (the building blocks that do the work)")
+                elif c['Mutation'].startswith('c.'):
+                    st.caption("💡 'c.' means this describes a change in the DNA code")
+                
                 st.markdown(f"- **Disease/Phenotype:** {c['Disease/Phenotype']}")
-                st.markdown(f"- **Clinical significance:** {c['Clinical significance']}")
-                if c["PMID"] != "—":
-                    st.markdown(f"- **PMID:** [{c['PMID']}](https://pubmed.ncbi.nlm.nih.gov/{c['PMID']}/)")
+                
+                # Explain clinical significance
+                sig = c['Clinical significance']
+                sig_explanation = {
+                    'Pathogenic': '⚠️ This variant is known to cause disease',
+                    'Likely Pathogenic': '⚠️ This variant is strongly suspected to cause disease',
+                    'Benign': '✅ This variant does not cause disease',
+                    'Likely Benign': '✅ This variant is unlikely to cause disease',
+                    'VUS': '❓ The significance of this variant is uncertain - more research is needed',
+                    'Variant of Uncertain Significance': '❓ The significance of this variant is uncertain - more research is needed'
+                }.get(sig, '')
+                
+                if sig_explanation:
+                    st.markdown(f"- **Clinical significance:** {sig} - {sig_explanation}")
                 else:
-                    st.caption("No PMID found; attempted PubMed search.")
-                st.markdown(f"> {c['Summary']}")
+                    st.markdown(f"- **Clinical significance:** {sig}")
+                
+                if c["PMID"] != "—":
+                    st.markdown(f"- **Research paper:** [PMID {c['PMID']}](https://pubmed.ncbi.nlm.nih.gov/{c['PMID']}/) (click to read the original study)")
+                else:
+                    st.caption("No research paper found for this variant.")
+                
+                st.markdown(f"**Summary:** {c['Summary']}")
 
 # ----------------------------
 # Render selected page
