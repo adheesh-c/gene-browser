@@ -55,10 +55,71 @@ POSSIBLE_NAME_COLS    = ["Name","VariantName","VARIANT_NAME"]
 
 POSSIBLE_HGVSC_COLS   = ["HGVSc","HGVS_cDNA","HGVS_c","hgvs_c","cdna_change"]
 POSSIBLE_HGVSP_COLS   = ["HGVSp","Protein_change","HGVS_p","hgvs_p","ProteinChange","protein_change"]
+POSSIBLE_CHROM_COLS   = ["Chromosome","chromosome","CHROM","chrom","Chr","chr"]
+POSSIBLE_POS_COLS     = ["Start","start","POS","pos","Position","position"]
 
 # NCBI etiquette
 NCBI_TOOL = "gene-browser"
 NCBI_EMAIL = st.secrets.get("NCBI_EMAIL", "")
+
+# ----------------------------
+# Gene summaries (hardcoded for common educational genes; NCBI API fallback for others)
+# ----------------------------
+GENE_SUMMARIES = {
+    "BRCA1": "BRCA1 encodes a tumor suppressor that helps repair damaged DNA through homologous recombination. Pathogenic variants significantly increase lifetime risk of breast and ovarian cancer.",
+    "BRCA2": "BRCA2 plays a central role in DNA repair alongside BRCA1. Variants are associated with elevated risk of breast, ovarian, prostate, and pancreatic cancers.",
+    "TP53": "TP53 encodes p53, often called the 'guardian of the genome,' which halts cell division or triggers cell death when DNA is damaged. It is the most frequently mutated gene across all human cancers.",
+    "CFTR": "CFTR encodes a chloride channel that regulates fluid balance in the lungs and digestive tract. Loss-of-function variants cause cystic fibrosis, a recessive disease affecting mucus, sweat, and digestion.",
+    "HTT": "HTT encodes huntingtin, a protein essential for normal brain development. An expanded CAG repeat causes Huntington's disease, a progressive and currently incurable neurodegenerative disorder.",
+    "APOE": "APOE encodes apolipoprotein E, a key regulator of cholesterol and lipid transport in blood and brain. The ε4 allele is the strongest known genetic risk factor for late-onset Alzheimer's disease.",
+    "LDLR": "LDLR encodes the LDL receptor, which clears cholesterol-carrying particles from the bloodstream. Variants that impair the receptor cause familial hypercholesterolemia and early-onset heart disease.",
+    "RB1": "RB1 encodes the retinoblastoma protein, a critical brake on the cell cycle that prevents uncontrolled growth. Biallelic loss causes retinoblastoma, a childhood eye tumor, and predisposes to other cancers.",
+    "APC": "APC encodes a tumor suppressor that regulates the Wnt cell-growth signaling pathway. Germline variants cause familial adenomatous polyposis (FAP), with hundreds of colon polyps and near-certain colorectal cancer risk.",
+    "MLH1": "MLH1 encodes a DNA mismatch repair protein that corrects replication errors before they become mutations. Variants cause Lynch syndrome, the most common hereditary colorectal cancer predisposition syndrome.",
+    "PTEN": "PTEN encodes a phosphatase that suppresses the PI3K/AKT cell-growth signaling pathway. Loss of function is linked to Cowden syndrome and is among the most frequent alterations in sporadic cancers.",
+    "VHL": "VHL encodes a protein that regulates HIF-1α and the cellular response to low oxygen levels. Germline variants cause von Hippel-Lindau disease, predisposing to kidney cancer and brain hemangioblastomas.",
+    "NF1": "NF1 encodes neurofibromin, which suppresses RAS-driven cell proliferation signals. Variants cause neurofibromatosis type 1, characterized by benign nerve-sheath tumors, skin markings, and learning differences.",
+    "NF2": "NF2 encodes merlin, a tumor suppressor in Schwann and meningeal cells. Variants cause neurofibromatosis type 2, presenting with bilateral vestibular schwannomas and progressive hearing loss.",
+    "TSC1": "TSC1 encodes hamartin, which together with TSC2 suppresses mTOR-driven cell growth. Variants cause tuberous sclerosis complex, with benign tumors forming in the brain, skin, kidneys, and lungs.",
+    "TSC2": "TSC2 encodes tuberin, the catalytic partner of hamartin in the mTOR-suppressing complex. Variants cause tuberous sclerosis complex with multi-organ benign tumor formation.",
+    "PKD1": "PKD1 encodes polycystin-1, a membrane protein involved in cell-to-cell signaling in kidney tubules. Variants account for ~85% of autosomal dominant polycystic kidney disease (ADPKD), the most common inherited kidney disorder.",
+    "PKD2": "PKD2 encodes polycystin-2, an ion channel that partners with polycystin-1. Variants cause the remaining ~15% of ADPKD, generally with a milder course.",
+    "HEXA": "HEXA encodes the alpha subunit of beta-hexosaminidase A, which breaks down GM2 gangliosides in lysosomes. Biallelic variants cause Tay-Sachs disease, a fatal infantile neurological disorder.",
+    "PAH": "PAH encodes phenylalanine hydroxylase, which converts phenylalanine to tyrosine in the liver. Biallelic variants cause phenylketonuria (PKU); untreated, excess phenylalanine causes severe intellectual disability.",
+    "MUTYH": "MUTYH encodes a base-excision repair enzyme that corrects oxidative DNA damage. Biallelic variants cause MUTYH-associated polyposis, increasing colorectal cancer risk.",
+    "KRAS": "KRAS encodes a GTPase central to growth factor signaling from cell-surface receptors. Somatic KRAS mutations are among the most frequent in human cancers, including pancreatic, colorectal, and lung adenocarcinoma.",
+}
+
+@st.cache_data(ttl=60*60*24, show_spinner=False)
+def fetch_ncbi_gene_summary(gene_symbol: str) -> str | None:
+    try:
+        search_params = {
+            "db": "gene",
+            "term": f"{gene_symbol}[Gene Name] AND Homo sapiens[Organism]",
+            "retmode": "json", "retmax": "1",
+        }
+        if NCBI_TOOL: search_params["tool"] = NCBI_TOOL
+        if NCBI_EMAIL: search_params["email"] = NCBI_EMAIL
+        r = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+                         params=search_params, timeout=10)
+        r.raise_for_status()
+        ids = r.json().get("esearchresult", {}).get("idlist", [])
+        if not ids:
+            return None
+        fetch_params = {"db": "gene", "id": ids[0], "retmode": "json"}
+        if NCBI_TOOL: fetch_params["tool"] = NCBI_TOOL
+        if NCBI_EMAIL: fetch_params["email"] = NCBI_EMAIL
+        r2 = requests.get("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
+                          params=fetch_params, timeout=10)
+        r2.raise_for_status()
+        result = r2.json().get("result", {})
+        summary = result.get(ids[0], {}).get("summary", "")
+        if summary:
+            sents = re.split(r"(?<=[.!?])\s+", summary.strip())
+            return " ".join(sents[:2])
+        return None
+    except Exception:
+        return None
 
 # ----------------------------
 # PubMed helpers
@@ -305,6 +366,11 @@ st.markdown("""
 }
 .kidcard { border:1px solid #e6e8ff; border-radius:14px; padding:1rem; background:#fafbff; }
 .smallmuted { color: rgba(0,0,0,0.6); font-size: 0.95rem; }
+.gene-info-box {
+  padding: 1rem 1.2rem; border-radius: 12px;
+  background: #f0f4ff; border-left: 4px solid #4f46e5;
+  margin-bottom: 1rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -316,6 +382,9 @@ if "loaded_params" not in st.session_state:
     st.session_state["query"] = (st.query_params.get("gene", "") or "").upper()
     st.session_state["selected_sigs"] = _get_param_list("sig")
     st.session_state["selected_conditions"] = _get_param_list("cond")
+
+if "search_history" not in st.session_state:
+    st.session_state["search_history"] = []
 
 # ----------------------------
 # TOP NAV + PAGE ROUTING
@@ -374,7 +443,7 @@ def render_home():
         3. **Look at the results table** - each row is a different variant
         4. **Click "Generate cards"** at the bottom to see easy-to-read summaries
         5. **Use the sidebar filters** to narrow down results by disease or significance
-        
+
         **Don't understand the terms?** Check out the "About" page for explanations!
         """)
 
@@ -534,21 +603,36 @@ def filter_variants(df: pd.DataFrame, gene_text: str) -> pd.DataFrame:
     return contains
 
 def color_significance(val):
-    """Helper function to color-code clinical significance values"""
     if pd.isna(val):
         return ''
     val_str = str(val).lower()
     if 'pathogenic' in val_str and 'likely' not in val_str:
-        return 'background-color: #ffebee'  # Light red
+        return 'background-color: #ffebee'
     elif 'likely pathogenic' in val_str:
-        return 'background-color: #fff3e0'  # Light orange
+        return 'background-color: #fff3e0'
     elif 'benign' in val_str and 'likely' not in val_str:
-        return 'background-color: #e8f5e9'  # Light green
+        return 'background-color: #e8f5e9'
     elif 'likely benign' in val_str:
-        return 'background-color: #f1f8e9'  # Light yellow-green
+        return 'background-color: #f1f8e9'
     elif 'uncertain' in val_str or 'vus' in val_str:
-        return 'background-color: #f3e5f5'  # Light purple
+        return 'background-color: #f3e5f5'
     return ''
+
+def _normalize_sig_category(val: str) -> str:
+    v = str(val).lower()
+    if "likely pathogenic" in v:
+        return "Likely Pathogenic"
+    if "pathogenic" in v and "conflicting" not in v:
+        return "Pathogenic"
+    if "likely benign" in v:
+        return "Likely Benign"
+    if "benign" in v:
+        return "Benign"
+    if "uncertain" in v or "vus" in v:
+        return "VUS"
+    if "conflicting" in v:
+        return "Conflicting"
+    return "Other"
 
 
 def render_tool():
@@ -556,7 +640,7 @@ def render_tool():
     with st.sidebar:
         st.header("Filters")
         st.caption("Use these to narrow down your search results")
-        
+
         sig_options  = sorted(variants_df["clinical_significance"].dropna().unique().tolist()) if "clinical_significance" in variants_df.columns else []
         cond_options = sorted(variants_df["condition"].dropna().unique().tolist()) if "condition" in variants_df.columns else []
 
@@ -575,6 +659,26 @@ def render_tool():
 
         st.session_state["selected_sigs"] = selected_sigs
         st.session_state["selected_conditions"] = selected_conditions
+
+        st.markdown("---")
+
+        # Recent searches
+        history = st.session_state.get("search_history", [])
+        if history:
+            st.caption("Recent searches")
+            for past_gene in history:
+                if st.button(past_gene, key=f"hist_{past_gene}"):
+                    st.session_state["query"] = past_gene
+                    _set_params_keep_page(past_gene, st.session_state.get("selected_sigs", []), st.session_state.get("selected_conditions", []))
+                    st.rerun()
+            st.markdown("---")
+
+        # Teacher mode
+        teacher_mode = st.checkbox(
+            "Teacher mode",
+            value=False,
+            help="Shows iframe embed code so you can embed this search in slides or a class website"
+        )
 
         st.markdown("---")
         st.caption("Data source: ClinVar subset. PubMed summaries via NCBI E-utilities.")
@@ -601,12 +705,12 @@ def render_tool():
     with st.expander("💡 Example: Understanding a variant", expanded=False):
         st.markdown("""
         **Example variant:** `p.Val1736Ala` in BRCA1
-        
+
         **What this means:**
         - In the BRCA1 gene, at position 1736
         - The amino acid **Valine (Val)** was changed to **Alanine (Ala)**
         - This is like changing one letter in a word: "cat" → "bat"
-        
+
         **Why it matters:**
         - This small change can affect how the protein works
         - If the protein doesn't work correctly, it may not protect against cancer
@@ -653,16 +757,15 @@ def render_tool():
         st.markdown('<div class="hero">', unsafe_allow_html=True)
         st.markdown("## Welcome!")
         st.write("**New to genetics?** Start by searching for a well-known gene:")
-        
-        # Add descriptions for each gene
+
         gene_descriptions = {
             "BRCA1": "Breast cancer gene 1 - helps repair DNA",
-            "BRCA2": "Breast cancer gene 2 - also helps repair DNA", 
+            "BRCA2": "Breast cancer gene 2 - also helps repair DNA",
             "TP53": "Tumor protein 53 - 'guardian of the genome'",
             "APC": "Adenomatous polyposis coli - involved in colon cancer",
             "MLH1": "DNA mismatch repair gene - helps fix DNA errors"
         }
-        
+
         cols = st.columns(5)
         picks = ["BRCA1", "BRCA2", "TP53", "APC", "MLH1"]
         for i, g in enumerate(picks):
@@ -672,13 +775,13 @@ def render_tool():
                     _set_params_keep_page(g, st.session_state.get("selected_sigs", []), st.session_state.get("selected_conditions", []))
                     st.rerun()
                 st.caption(gene_descriptions[g])
-        
+
         st.markdown("---")
         st.markdown("** Tip:** After searching, click 'Generate cards' to see easy-to-read summaries!")
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
-    # Suggestions
+    # Fuzzy suggestions
     gene_options = sorted(df_live["gene"].dropna().unique().tolist()) if "gene" in df_live.columns else []
     if query and (query not in df_live["gene"].unique()):
         suggestions = fuzzy_gene_candidates(query, gene_options, limit=5)
@@ -691,6 +794,17 @@ def render_tool():
                     _set_params_keep_page(s, st.session_state.get("selected_sigs", []), st.session_state.get("selected_conditions", []))
                     st.rerun()
 
+    # Gene summary card
+    gene_blurb = GENE_SUMMARIES.get(query)
+    if gene_blurb is None:
+        with st.spinner(f"Looking up {query}..."):
+            gene_blurb = fetch_ncbi_gene_summary(query)
+    if gene_blurb:
+        st.markdown(
+            f'<div class="gene-info-box"><b>{query}</b> — {gene_blurb}</div>',
+            unsafe_allow_html=True
+        )
+
     # Filter + apply sidebar filters
     results = filter_variants(df_live, query)
     if st.session_state.get("selected_sigs"):
@@ -700,6 +814,13 @@ def render_tool():
 
     results = results.head(int(topk))
 
+    # Update search history
+    if query and not results.empty:
+        history = st.session_state.get("search_history", [])
+        if query not in history:
+            history = [query] + history
+        st.session_state["search_history"] = history[:10]
+
     # Metrics
     left, right = st.columns(2)
     with left:
@@ -707,9 +828,49 @@ def render_tool():
     with right:
         st.metric("Unique conditions", results["condition"].nunique() if not results.empty else 0)
 
-    # Share section (not ugly debug)
+    # Pathogenicity breakdown chart
+    if not results.empty and "clinical_significance" in results.columns:
+        cats = results["clinical_significance"].dropna().map(_normalize_sig_category)
+        order = ["Pathogenic", "Likely Pathogenic", "VUS", "Conflicting", "Likely Benign", "Benign", "Other"]
+        counts = cats.value_counts().reindex(order, fill_value=0)
+        counts = counts[counts > 0]
+        if not counts.empty:
+            with st.expander("Pathogenicity breakdown", expanded=True):
+                st.bar_chart(counts)
+                st.caption("Distribution of clinical significance categories across the variants shown.")
+
+    # Chromosome location banner (only when all variants are on one chromosome)
+    chrom_col = _pick_first(df_live, POSSIBLE_CHROM_COLS)
+    pos_col   = _pick_first(df_live, POSSIBLE_POS_COLS)
+    if not results.empty and chrom_col and pos_col:
+        chroms = results[chrom_col].dropna().unique()
+        if len(chroms) == 1:
+            pos_vals = results[pos_col].dropna()
+            if not pos_vals.empty:
+                try:
+                    st.caption(f"📍 Chromosome {chroms[0]}, position {int(float(pos_vals.iloc[0])):,}")
+                except (ValueError, TypeError):
+                    pass
+
+    # Share section
     with st.expander("Share"):
         st.write("Copy the link from your browser address bar to share this search + filters.")
+
+    # Teacher mode embed code
+    if teacher_mode:
+        with st.expander("Embed this search (Teacher mode)", expanded=True):
+            embed_params = f"?embed=true&page=tool&gene={query}"
+            if st.session_state.get("selected_sigs"):
+                embed_params += "&sig=" + "|".join(st.session_state["selected_sigs"])
+            iframe_code = (
+                f'<iframe src="https://your-app.streamlit.app{embed_params}" '
+                f'width="100%" height="700" frameborder="0"></iframe>'
+            )
+            st.code(iframe_code, language="html")
+            st.caption(
+                "Replace `your-app.streamlit.app` with your deployment URL. "
+                "The `?embed=true` parameter hides the Streamlit toolbar for a cleaner classroom view."
+            )
 
     # Table
     if results.empty:
@@ -727,8 +888,7 @@ def render_tool():
     preferred_cols = ["gene", "variant_id", "protein_change", "cdna_change",
                       "clinical_significance", "condition", "source", "PMID"]
     ordered_cols = [c for c in preferred_cols if c in results.columns] + [c for c in results.columns if c not in preferred_cols]
-    
-    # Apply color coding to clinical significance column if it exists
+
     if "clinical_significance" in ordered_cols:
         styled_df = results[ordered_cols].style.map(color_significance, subset=['clinical_significance'])
         st.dataframe(styled_df, width="stretch", hide_index=True)
@@ -753,19 +913,18 @@ def render_tool():
 
         if st.button("Generate cards"):
             cards = build_variant_cards(df_live, query, n=int(n_cards))
+            gene_context = GENE_SUMMARIES.get(query, "")
             for i, c in enumerate(cards, 1):
                 st.markdown("---")
                 st.markdown(f"**Variant {i}: {c['Mutation']}**")
-                
-                # Add explanation of mutation notation
+
                 if c['Mutation'].startswith('p.'):
                     st.caption("💡 'p.' means this describes a change in the protein (the building blocks that do the work)")
                 elif c['Mutation'].startswith('c.'):
                     st.caption("💡 'c.' means this describes a change in the DNA code")
-                
+
                 st.markdown(f"- **Disease/Phenotype:** {c['Disease/Phenotype']}")
-                
-                # Explain clinical significance
+
                 sig = c['Clinical significance']
                 sig_explanation = {
                     'Pathogenic': '⚠️ This variant is known to cause disease',
@@ -775,18 +934,41 @@ def render_tool():
                     'VUS': '❓ The significance of this variant is uncertain - more research is needed',
                     'Variant of Uncertain Significance': '❓ The significance of this variant is uncertain - more research is needed'
                 }.get(sig, '')
-                
+
                 if sig_explanation:
-                    st.markdown(f"- **Clinical significance:** {sig} - {sig_explanation}")
+                    st.markdown(f"- **Clinical significance:** {sig} — {sig_explanation}")
                 else:
                     st.markdown(f"- **Clinical significance:** {sig}")
-                
+
                 if c["PMID"] != "—":
                     st.markdown(f"- **Research paper:** [PMID {c['PMID']}](https://pubmed.ncbi.nlm.nih.gov/{c['PMID']}/) (click to read the original study)")
                 else:
                     st.caption("No research paper found for this variant.")
-                
+
                 st.markdown(f"**Summary:** {c['Summary']}")
+
+                # Why does this matter?
+                sig_lower = sig.lower()
+                disease = c["Disease/Phenotype"]
+                why_parts = []
+                if "pathogenic" in sig_lower and "benign" not in sig_lower:
+                    if disease and disease != "Not specified":
+                        why_parts.append(f"This variant is classified as **{sig}**, meaning it is linked to an increased risk of **{disease}**.")
+                    else:
+                        why_parts.append(f"This variant is classified as **{sig}**, meaning it may contribute to disease.")
+                    if gene_context:
+                        why_parts.append(f"**About {query}:** {gene_context}")
+                elif "benign" in sig_lower:
+                    why_parts.append(f"This variant is classified as **{sig}** — the {query} gene still functions normally despite this DNA change.")
+                elif "uncertain" in sig_lower or "vus" in sig_lower:
+                    why_parts.append("This variant's impact is **uncertain** (Variant of Uncertain Significance). Scientists need more evidence to determine whether it causes disease.")
+                    if disease and disease != "Not specified":
+                        why_parts.append(f"It has been observed in people with {disease}, but this association alone does not confirm it as the cause.")
+
+                if why_parts:
+                    with st.expander("Why does this matter?"):
+                        for part in why_parts:
+                            st.markdown(part)
 
 # ----------------------------
 # Render selected page
@@ -801,4 +983,3 @@ elif current_page == "about":
     render_about()
 elif current_page == "feedback":
     render_feedback()
-
