@@ -1,0 +1,16 @@
+CLAUDE.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Streamlit
+.streamlit/secrets.toml
+feedback_log.csv
+
+# macOS
+.DS_Store

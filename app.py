@@ -730,7 +730,7 @@ def render_tool():
     
     # Apply color coding to clinical significance column if it exists
     if "clinical_significance" in ordered_cols:
-        styled_df = results[ordered_cols].style.applymap(color_significance, subset=['clinical_significance'])
+        styled_df = results[ordered_cols].style.map(color_significance, subset=['clinical_significance'])
         st.dataframe(styled_df, width="stretch", hide_index=True)
     else:
         st.dataframe(results[ordered_cols], width="stretch", hide_index=True)
