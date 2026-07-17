@@ -5,7 +5,6 @@ import streamlit as st
 import time, re, os
 from typing import Optional, Tuple, List
 import requests
-from datetime import datetime
 
 # ----------------------------
 # Fuzzy matching (RapidFuzz preferred)
@@ -547,24 +546,27 @@ This app does not collect personal health information.
 
 def render_impact():
     st.title("Impact")
-    st.markdown("""
-Show proof that your project helped people.
+    st.markdown("A look at how this tool is being used.")
 
-### What will be put
-- Number of users (visits)
-- Number of gene searches
-- CSV downloads
-- Feedback submissions
-- Workshops / presentations delivered
-- People reached
+    metrics = [
+        ("Users (visits)", None),
+        ("Gene searches", None),
+        ("CSV downloads", None),
+        ("Feedback submissions", None),
+        ("Workshops / presentations delivered", None),
+        ("People reached", None),
+    ]
 
-### Plan for impact
-1. Present it to one real group (club/class/library).
-2. Collect feedback with the Feedback tab.
-3. Improve the tool based on feedback.
-4. Report numbers here.
-""")
+    cols = st.columns(3)
+    for i, (label, value) in enumerate(metrics):
+        with cols[i % 3]:
+            st.metric(label, value if value is not None else "Coming soon...")
 
+
+GOOGLE_FORM_ID = "1FAIpQLSdJdPqQgxoZ_FV0uKSxBNBqThQAKGfQ4c0bdkcCGjAtTp49lg"
+GOOGLE_FORM_ENTRY_NAME = "entry.1158372084"
+GOOGLE_FORM_ENTRY_ROLE = "entry.1263955312"
+GOOGLE_FORM_ENTRY_MESSAGE = "entry.953699830"
 
 def render_feedback():
     st.title("Feedback")
@@ -577,17 +579,22 @@ def render_feedback():
         submitted = st.form_submit_button("Send")
 
     if submitted:
-        ts = datetime.utcnow().isoformat()
-        row = pd.DataFrame([{"timestamp": ts, "name": name, "role": role, "message": msg}])
         try:
-            log_path = Path("feedback_log.csv")
-            if log_path.exists():
-                row.to_csv(log_path, mode="a", header=False, index=False)
+            resp = requests.post(
+                f"https://docs.google.com/forms/d/e/{GOOGLE_FORM_ID}/formResponse",
+                data={
+                    GOOGLE_FORM_ENTRY_NAME: name,
+                    GOOGLE_FORM_ENTRY_ROLE: role,
+                    GOOGLE_FORM_ENTRY_MESSAGE: msg,
+                },
+                timeout=10,
+            )
+            if resp.ok:
+                st.success("Thanks! Your feedback was recorded.")
             else:
-                row.to_csv(log_path, index=False)
-            st.success("Thanks! Your feedback was recorded.")
+                st.error("Sorry, something went wrong submitting your feedback. Please try again.")
         except Exception:
-            st.info("Thanks! (Logging failed on this host.)")
+            st.error("Sorry, something went wrong submitting your feedback. Please try again.")
 
 
 def filter_variants(df: pd.DataFrame, gene_text: str) -> pd.DataFrame:
