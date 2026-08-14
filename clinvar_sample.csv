@@ -1,6 +1,219 @@
-gene,variant_id,protein_change,cdna_change,clinical_significance,condition,source,PMID
-BRCA1,VCV000123456.1,p.Val1736Ala,c.5207T>C,Pathogenic,Hereditary breast and ovarian cancer,ClinVar,23269703
-BRCA1,VCV000654321.3,p.Glu23Valfs,c.68_69del,Pathogenic,Hereditary breast and ovarian cancer,ClinVar,7550349
-BRCA2,VCV000987654.2,p.Ser1982Arg,c.5946G>A,Likely_pathogenic,Hereditary breast and ovarian cancer,ClinVar,8673091
-TP53,VCV000111111.1,p.Arg175His,c.524G>A,Pathogenic,Li-Fraumeni syndrome,ClinVar,8164043
-
+gene,variant_id,protein_change,cdna_change,clinical_significance,condition,source,PMID,collection
+ATRX,VCV001073930,p.Arg654Ter,c.1960C>T,Pathogenic,ATR-X-related syndrome,ClinVar,28492532,brain_tumor
+ATRX,VCV002699967,p.Arg1022Ter,c.3064C>T,Pathogenic/Likely pathogenic,Alpha thalassemia-X-linked intellectual disability syndrome,ClinVar,28492532,brain_tumor
+ATRX,VCV002723123,p.Arg418Ter,c.1252C>T,Pathogenic/Likely pathogenic,Alpha thalassemia-X-linked intellectual disability syndrome,ClinVar,35101336,brain_tumor
+ATRX,VCV004537280,,c.6699+5A>G,Uncertain significance,Alpha thalassemia-X-linked intellectual disability syndrome,ClinVar,28492532,brain_tumor
+ATRX,VCV004687307,p.Ala1158Gly,c.3473C>G,Uncertain significance,Alpha thalassemia-X-linked intellectual disability syndrome,ClinVar,28492532,brain_tumor
+ATRX,VCV004744894,p.Asp1111Glu,c.3333T>G,Uncertain significance,Alpha thalassemia-X-linked intellectual disability syndrome,ClinVar,31022120,brain_tumor
+ATRX,VCV001625612,,c.4957-20T>C,Benign/Likely benign,Alpha thalassemia-X-linked intellectual disability syndrome,ClinVar,28492532,brain_tumor
+ATRX,VCV001772485,p.Asn477Ser,c.1430A>G,Benign/Likely benign,Alpha thalassemia-X-linked intellectual disability syndrome,ClinVar,31022120,brain_tumor
+ATRX,VCV004801114,p.Pro449Thr,c.1345C>A,Benign,Alpha thalassemia-X-linked intellectual disability syndrome,ClinVar,28492532,brain_tumor
+EGFR,VCV003714966,p.Tyr113Ter,c.339C>G,Pathogenic,EGFR-related lung cancer,ClinVar,30813707,brain_tumor
+EGFR,VCV003726208,p.Trp477Ter,c.1430G>A,Pathogenic,EGFR-related lung cancer,ClinVar,30813707,brain_tumor
+EGFR,VCV004726907,p.Trp608Ter,c.1823G>A,Pathogenic,EGFR-related lung cancer,ClinVar,30813707,brain_tumor
+EGFR,VCV004870298,p.Lys609Glu,c.1825A>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,brain_tumor
+EGFR,VCV004870299,p.Pro936Thr,c.2806C>A,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,brain_tumor
+EGFR,VCV004870300,p.Met1002Lys,c.3005T>A,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,brain_tumor
+EGFR,VCV003773279,p.Ala840=,c.2520C>A,Benign/Likely benign,Lung cancer,ClinVar,30813707,brain_tumor
+EGFR,VCV003773357,p.Lys852=,c.2556G>A,Benign/Likely benign,Lung cancer,ClinVar,30813707,brain_tumor
+EGFR,VCV003773412,p.Val845=,c.2535G>T,Benign/Likely benign,Lung cancer,ClinVar,29398453,brain_tumor
+IDH1,VCV000156444,p.Arg132His,c.395G>A,Pathogenic/Likely pathogenic,Metaphyseal chondromatosis,ClinVar,37267439,brain_tumor
+IDH1,VCV000375891,p.Arg132Cys,c.394C>T,Pathogenic/Likely pathogenic,Maffucci syndrome,ClinVar,37324278,brain_tumor
+IDH1,VCV004056235,p.Arg20Gln,c.59G>A,Uncertain significance,Glioma susceptibility 1,ClinVar,25741868,brain_tumor
+IDH1,VCV004279963,p.His194Tyr,c.580C>T,Uncertain significance,Enchondromatosis,ClinVar,25741868,brain_tumor
+IDH1,VCV004279964,p.Ile99Met,c.297A>G,Uncertain significance,Enchondromatosis,ClinVar,25741868,brain_tumor
+IDH1,VCV000785024,,c.415-4A>G,Benign,not provided,ClinVar,28492532,brain_tumor
+IDH1,VCV001274994,,c.122+105G>A,Benign,not provided,ClinVar,25741868,brain_tumor
+TP53,VCV003673025,p.Trp23Ter,c.69G>A,Pathogenic,Li-Fraumeni syndrome,ClinVar,28492532,brain_tumor
+TP53,VCV004189257,,c.559+1G>C,Pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,25394175,brain_tumor
+TP53,VCV004189258,p.Asn239Lys,c.717C>A,Pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,30224644,brain_tumor
+TP53,VCV003809688,p.Pro142Ala,c.424C>G,Uncertain significance,Li-Fraumeni syndrome,ClinVar,30224644,brain_tumor
+TP53,VCV003972446,p.Pro142Thr,c.424C>A,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,30224644,brain_tumor
+TP53,VCV004865883,,c.-28-2A>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,brain_tumor
+TP53,VCV004071431,p.Gly108=,c.324T>C,Benign/Likely benign,Hereditary cancer-predisposing syndrome,ClinVar,35802134,brain_tumor
+TP53,VCV004071444,p.Lys139=,c.417G>A,Benign/Likely benign,Li-Fraumeni syndrome 1,ClinVar,35802134,brain_tumor
+TP53,VCV004071455,p.Pro219=,c.657C>T,Benign/Likely benign,Hereditary cancer-predisposing syndrome,ClinVar,35802134,brain_tumor
+APC,VCV004861083,p.Arg399Ter,c.1195A>T,Pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+APC,VCV004861226,p.Cys1855Ter,c.5565T>A,Pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+APC,VCV004575262,p.Ser2005Ter,c.6014C>G,Pathogenic/Likely pathogenic,Familial adenomatous polyposis 1,ClinVar,35802134,hereditary_cancer
+APC,VCV004862176,p.Gln1447Arg,c.4340A>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+APC,VCV004862203,p.Val1352Leu,c.4054G>C,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+APC,VCV004862211,p.Ser1068Thr,c.3202T>A,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+APC,VCV003254511,p.Ser1936=,c.5808A>G,Benign/Likely benign,Familial adenomatous polyposis 1,ClinVar,35802134,hereditary_cancer
+APC,VCV003254521,p.Arg2833=,c.8499C>A,Benign/Likely benign,Hereditary cancer-predisposing syndrome,ClinVar,35802134,hereditary_cancer
+APC,VCV003254532,p.Gly2370=,c.7110T>C,Benign/Likely benign,Familial adenomatous polyposis 1,ClinVar,35802134,hereditary_cancer
+BRCA1,VCV004625641,p.Lys503Ter,c.1507A>T,Pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+BRCA1,VCV004713082,p.Leu393Ter,c.1178T>G,Pathogenic,Hereditary breast ovarian cancer syndrome,ClinVar,33410258,hereditary_cancer
+BRCA1,VCV004867744,p.Leu752Ter,c.2255T>G,Pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+BRCA1,VCV004800863,p.His270Gln,c.810T>A,Uncertain significance,Hereditary breast ovarian cancer syndrome,ClinVar,33410258,hereditary_cancer
+BRCA1,VCV004800870,p.Arg133Gly,c.397C>G,Uncertain significance,Hereditary breast ovarian cancer syndrome,ClinVar,33410258,hereditary_cancer
+BRCA1,VCV004867749,p.Ser1374Thr,c.4121G>C,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+BRCA1,VCV004625758,p.His318Gln,c.954T>G,Benign/Likely benign,Hereditary cancer-predisposing syndrome,ClinVar,39142283,hereditary_cancer
+BRCA1,VCV000628452,p.His971Arg,c.2912A>G,Benign,"Breast-ovarian cancer, familial, susceptibility to, 1",ClinVar,35802134,hereditary_cancer
+BRCA1,VCV000812549,p.Met297Ile,c.891G>T,Benign,"Breast-ovarian cancer, familial, susceptibility to, 1",ClinVar,35802134,hereditary_cancer
+BRCA2,VCV004875765,p.Glu1665Ter,c.4993G>T,Pathogenic,"Breast-ovarian cancer, familial, susceptibility to, 2",ClinVar,35802134,hereditary_cancer
+BRCA2,VCV004876123,p.Ser2022Ter,c.6065C>A,Pathogenic,"Breast-ovarian cancer, familial, susceptibility to, 2",ClinVar,35802134,hereditary_cancer
+BRCA2,VCV004876165,p.Glu2193Ter,c.6577G>T,Pathogenic,"Breast-ovarian cancer, familial, susceptibility to, 2",ClinVar,35802134,hereditary_cancer
+BRCA2,VCV004876239,p.Lys3132Asn,c.9396A>T,Uncertain significance,Inherited breast cancer and ovarian cancer,ClinVar,29446198,hereditary_cancer
+BRCA2,VCV004876247,p.Gly637Ser,c.1909G>A,Uncertain significance,Inherited breast cancer and ovarian cancer,ClinVar,29446198,hereditary_cancer
+BRCA2,VCV004879473,p.Glu7Gln,c.19G>C,Uncertain significance,Hereditary breast ovarian cancer syndrome,ClinVar,33410258,hereditary_cancer
+BRCA2,VCV001169136,p.Lys2950Asn,c.8850G>C,Benign/Likely benign,Hereditary breast ovarian cancer syndrome,ClinVar,35802134,hereditary_cancer
+BRCA2,VCV000812552,p.Ala2912Thr,c.8734G>A,Benign,"Breast-ovarian cancer, familial, susceptibility to, 2",ClinVar,35802134,hereditary_cancer
+BRCA2,VCV000812553,,c.8754+75A>G,Benign,"Breast-ovarian cancer, familial, susceptibility to, 2",ClinVar,35802134,hereditary_cancer
+KRAS,VCV000012594,p.Lys5Asn,c.15A>T,Pathogenic,RASopathy,ClinVar,31022120,hereditary_cancer
+KRAS,VCV000040452,p.Gln22Arg,c.65A>G,Pathogenic,RASopathy,ClinVar,42258614,hereditary_cancer
+KRAS,VCV000040454,p.Pro34Leu,c.101C>T,Pathogenic,Noonan syndrome,ClinVar,37895220,hereditary_cancer
+KRAS,VCV001915455,,c.450+5G>A,Uncertain significance,RASopathy,ClinVar,42258614,hereditary_cancer
+KRAS,VCV002061689,p.His95Asn,c.283C>A,Uncertain significance,RASopathy,ClinVar,28492532,hereditary_cancer
+KRAS,VCV002909102,p.Met111Val,c.331A>G,Uncertain significance,RASopathy,ClinVar,42258614,hereditary_cancer
+KRAS,VCV000379556,,c.5-18A>G,Benign/Likely benign,Noonan syndrome 3,ClinVar,42258614,hereditary_cancer
+KRAS,VCV000496491,,c.4+5G>A,Benign/Likely benign,Acute myeloid leukemia,ClinVar,42258614,hereditary_cancer
+KRAS,VCV000041449,p.Asp173=,c.519T>C,Benign,RASopathy,ClinVar,28492532,hereditary_cancer
+MLH1,VCV004827080,p.Glu703Ter,c.2107G>T,Pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+MLH1,VCV004856732,,c.306+1G>T,Pathogenic,"Colorectal cancer, hereditary nonpolyposis, type 2",ClinVar,35802134,hereditary_cancer
+MLH1,VCV004856779,p.Met1Ile,c.3G>C,Pathogenic,"Colorectal cancer, hereditary nonpolyposis, type 2",ClinVar,35802134,hereditary_cancer
+MLH1,VCV004773664,p.Phe220Val,c.658T>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,28492532,hereditary_cancer
+MLH1,VCV004801634,p.Glu390Gly,c.1169A>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,28492532,hereditary_cancer
+MLH1,VCV004860127,p.Ile229Met,c.687A>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+MLH1,VCV003773567,p.Glu669=,c.2007A>G,Benign/Likely benign,Hereditary cancer-predisposing syndrome,ClinVar,35802134,hereditary_cancer
+MLH1,VCV003773578,p.Pro138=,c.414T>C,Benign/Likely benign,"Colorectal cancer, hereditary nonpolyposis, type 2",ClinVar,35802134,hereditary_cancer
+MLH1,VCV003773605,p.Ser95=,c.285T>C,Benign/Likely benign,Hereditary cancer-predisposing syndrome,ClinVar,35802134,hereditary_cancer
+MUTYH,VCV002886235,p.Gln43Ter,c.127C>T,Pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,35802134,hereditary_cancer
+MUTYH,VCV003400123,p.Gln397Ter,c.1189C>T,Pathogenic,Familial adenomatous polyposis 2,ClinVar,35802134,hereditary_cancer
+MUTYH,VCV002676902,p.Gln126Ter,c.376C>T,Pathogenic/Likely pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,35802134,hereditary_cancer
+MUTYH,VCV004659105,p.Gly171Val,c.512G>T,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25741868,hereditary_cancer
+MUTYH,VCV004860479,,c.1103-5C>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+MUTYH,VCV004860489,p.Leu145Arg,c.434T>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,40738107,hereditary_cancer
+MUTYH,VCV001685912,,c.704+16A>G,Benign/Likely benign,Familial adenomatous polyposis 2,ClinVar,35802134,hereditary_cancer
+MUTYH,VCV004659645,p.Glu167Asp,c.501G>C,Benign,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+MUTYH,VCV004843752,p.Ala32Val,c.95C>T,Benign,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+PTEN,VCV004879828,p.Lys125Thr,c.374A>C,Pathogenic,PTEN hamartoma tumor syndrome,ClinVar,40098637,hereditary_cancer
+PTEN,VCV003669092,p.Trp111Cys,c.333G>T,Pathogenic/Likely pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,35102303,hereditary_cancer
+PTEN,VCV003767590,p.Leu98Pro,c.293T>C,Pathogenic/Likely pathogenic,Macrocephaly-autism syndrome,ClinVar,39358013,hereditary_cancer
+PTEN,VCV004862741,p.Asn323Asp,c.967A>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,29706350,hereditary_cancer
+PTEN,VCV004862742,p.Asn63Lys,c.189C>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+PTEN,VCV004879522,p.Gly251Arg,c.751G>C,Uncertain significance,Cowden syndrome 1,ClinVar,35802134,hereditary_cancer
+PTEN,VCV003903820,p.Asn12=,c.36C>T,Benign/Likely benign,Cowden syndrome 1,ClinVar,35802134,hereditary_cancer
+PTEN,VCV003903832,p.Arg130=,c.390A>G,Benign/Likely benign,Cowden syndrome 1,ClinVar,35802134,hereditary_cancer
+PTEN,VCV003904430,p.Val175=,c.525G>A,Benign/Likely benign,Cowden syndrome 1,ClinVar,35802134,hereditary_cancer
+RB1,VCV004759399,,c.940-2A>T,Pathogenic,Hereditary retinoblastoma,ClinVar,25741868,hereditary_cancer
+RB1,VCV004824136,p.Leu688Arg,c.2063T>G,Pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+RB1,VCV004759313,p.Ser567Ter,c.1700C>A,Pathogenic/Likely pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,25741868,hereditary_cancer
+RB1,VCV004863035,p.Asp338Val,c.1013A>T,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+RB1,VCV004863037,p.Ile92Phe,c.274A>T,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+RB1,VCV004863039,p.Arg611Ser,c.1833A>T,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,hereditary_cancer
+RB1,VCV004758524,,c.1421+14T>C,Benign/Likely benign,Retinoblastoma,ClinVar,35802134,hereditary_cancer
+RB1,VCV004842595,p.Gly100=,c.300A>T,Benign/Likely benign,Retinoblastoma,ClinVar,35802134,hereditary_cancer
+RB1,VCV004757991,,c.1421+16T>C,Benign,Retinoblastoma,ClinVar,35802134,hereditary_cancer
+VHL,VCV000936684,p.Trp88Ter,c.264G>A,Pathogenic,Von Hippel-Lindau syndrome,ClinVar,40249889,hereditary_cancer
+VHL,VCV001070179,p.Ser80Asn,c.239G>A,Pathogenic/Likely pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,38969834,hereditary_cancer
+VHL,VCV001730577,p.Tyr112Ser,c.335A>C,Pathogenic/Likely pathogenic,Hereditary cancer-predisposing syndrome,ClinVar,35802134,hereditary_cancer
+VHL,VCV003753891,p.Glu17Asp,c.51G>C,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,35802134,hereditary_cancer
+VHL,VCV003979718,p.Gly104Asp,c.311G>A,Uncertain significance,Von Hippel-Lindau syndrome,ClinVar,38969834,hereditary_cancer
+VHL,VCV004558075,p.Pro25Arg,c.74C>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,35802134,hereditary_cancer
+VHL,VCV003468038,p.Pro81=,c.243G>A,Benign/Likely benign,Von Hippel-Lindau syndrome,ClinVar,35802134,hereditary_cancer
+VHL,VCV003761631,p.Val83=,c.249C>T,Benign/Likely benign,Von Hippel-Lindau syndrome,ClinVar,35802134,hereditary_cancer
+VHL,VCV004071332,p.Leu48=,c.144G>A,Benign/Likely benign,Von Hippel-Lindau syndrome,ClinVar,35802134,hereditary_cancer
+CFTR,VCV004811574,,c.1767-2A>C,Pathogenic,Cystic fibrosis,ClinVar,37867076,metabolic
+CFTR,VCV003629912,p.Glu402Ter,c.1204G>T,Pathogenic/Likely pathogenic,Cystic fibrosis,ClinVar,32429104,metabolic
+CFTR,VCV004535906,p.Gln237Ter,c.709C>T,Pathogenic/Likely pathogenic,CFTR-related disorder,ClinVar,32404922,metabolic
+CFTR,VCV004868861,p.Lys1389Thr,c.4166A>C,Uncertain significance,Cystic fibrosis,ClinVar,32404922,metabolic
+CFTR,VCV004868864,p.Ser118Tyr,c.353C>A,Uncertain significance,Cystic fibrosis,ClinVar,32404922,metabolic
+CFTR,VCV004868866,p.Tyr28His,c.82T>C,Uncertain significance,Cystic fibrosis,ClinVar,32404922,metabolic
+CFTR,VCV001177002,,c.274-179G>A,Benign/Likely benign,Cystic fibrosis,ClinVar,32404922,metabolic
+CFTR,VCV001177029,,c.1767-136T>C,Benign/Likely benign,Cystic fibrosis,ClinVar,32404922,metabolic
+CFTR,VCV000818097,,c.3874-200G>A,Benign,Cystic fibrosis,ClinVar,32404922,metabolic
+HEXA,VCV002965563,p.Asp322Gly,c.965A>G,Pathogenic/Likely pathogenic,Tay-Sachs disease,ClinVar,33811753,metabolic
+HEXA,VCV003646441,p.Gln515Ter,c.1543C>T,Pathogenic/Likely pathogenic,Tay-Sachs disease,ClinVar,28492532,metabolic
+HEXA,VCV004732663,p.Trp147Ter,c.440G>A,Pathogenic/Likely pathogenic,Tay-Sachs disease,ClinVar,28492532,metabolic
+HEXA,VCV004806000,p.Thr153Ala,c.457A>G,Uncertain significance,Tay-Sachs disease,ClinVar,28492532,metabolic
+HEXA,VCV004841384,p.Leu359Met,c.1075C>A,Uncertain significance,Inborn genetic diseases,ClinVar,31022120,metabolic
+HEXA,VCV004858348,p.Ala20Ser,c.58G>T,Uncertain significance,Inborn genetic diseases,ClinVar,31022120,metabolic
+HEXA,VCV000256352,p.Val253=,c.759G>A,Benign/Likely benign,Inborn genetic diseases,ClinVar,31022120,metabolic
+HEXA,VCV000555127,,c.1146+8G>A,Benign/Likely benign,Tay-Sachs disease,ClinVar,28492532,metabolic
+HEXA,VCV000695235,p.Leu23=,c.69C>G,Benign/Likely benign,Tay-Sachs disease,ClinVar,31022120,metabolic
+LDLR,VCV004848586,p.Trp483Arg,c.1447T>A,Pathogenic,Familial hypercholesterolemia,ClinVar,41166440,metabolic
+LDLR,VCV004856670,p.Glu337Ter,c.1009G>T,Pathogenic,Cardiovascular phenotype,ClinVar,37565868,metabolic
+LDLR,VCV004857223,,c.2141-2A>C,Pathogenic,Familial hypercholesterolemia,ClinVar,24404629,metabolic
+LDLR,VCV004756132,p.Ile441Val,c.1321A>G,Uncertain significance,Familial hypercholesterolemia,ClinVar,25741868,metabolic
+LDLR,VCV004859177,p.Thr274Lys,c.821C>A,Uncertain significance,Cardiovascular phenotype,ClinVar,31491741,metabolic
+LDLR,VCV004859178,p.Ile473Met,c.1419C>G,Uncertain significance,Cardiovascular phenotype,ClinVar,31491741,metabolic
+LDLR,VCV000413780,p.Cys352=,c.1056C>T,Benign,"Hypercholesterolemia, familial, 1",ClinVar,35802134,metabolic
+LDLR,VCV000431533,,c.1586+16G>A,Benign,"Hypercholesterolemia, familial, 1",ClinVar,35802134,metabolic
+LDLR,VCV000456650,p.Ile441=,c.1323C>T,Benign,"Hypercholesterolemia, familial, 1",ClinVar,35802134,metabolic
+PAH,VCV002682170,p.Ile324Asn,c.971T>A,Pathogenic,Phenylketonuria,ClinVar,30050108,metabolic
+PAH,VCV003393462,p.Trp187Ter,c.560G>A,Pathogenic,Phenylketonuria,ClinVar,24667081,metabolic
+PAH,VCV003393468,p.Glu183Gly,c.548A>G,Pathogenic,Phenylketonuria,ClinVar,24667081,metabolic
+PAH,VCV003771197,p.Gly171Trp,c.511G>T,Uncertain significance,Phenylketonuria,ClinVar,24667081,metabolic
+PAH,VCV004540585,p.Asn28=,c.84C>T,Uncertain significance,Phenylketonuria,ClinVar,24667081,metabolic
+PAH,VCV004540588,p.Glu76Asp,c.228G>C,Uncertain significance,Phenylketonuria,ClinVar,24667081,metabolic
+PAH,VCV000585207,,c.60+62C>T,Benign,Phenylketonuria,ClinVar,33116287,metabolic
+PAH,VCV000729975,p.Asn133=,c.399T>C,Benign,Phenylketonuria,ClinVar,31022120,metabolic
+PAH,VCV000987908,,c.509+101A>C,Benign,Phenylketonuria,ClinVar,25741868,metabolic
+APOE,VCV000017850,p.Arg154Ser,c.460C>A,Pathogenic/Likely pathogenic,Familial hypercholesterolemia,ClinVar,24404629,neuro
+APOE,VCV000017880,p.Arg43Cys,c.127C>T,Pathogenic/Likely pathogenic,Cardiovascular phenotype,ClinVar,38584145,neuro
+APOE,VCV003934698,p.Val301Leu,c.901G>T,Uncertain significance,Familial hypercholesterolemia,ClinVar,24404629,neuro
+APOE,VCV004613735,p.Gln266Glu,c.796C>G,Uncertain significance,Familial hypercholesterolemia,ClinVar,24404629,neuro
+APOE,VCV004826760,p.Gly187Val,c.560G>T,Uncertain significance,Familial hypercholesterolemia,ClinVar,24404629,neuro
+APOE,VCV004829030,p.Arg207Cys,c.619C>T,Benign,Cardiovascular phenotype,ClinVar,37957317,neuro
+HTT,VCV000417745,p.Phe2717Tyr,c.8150T>A,Pathogenic,Lopes-Maciel-Rodan syndrome,ClinVar,33432339,neuro
+HTT,VCV002582507,p.Glu660Lys,c.1978G>A,Uncertain significance,Lopes-Maciel-Rodan syndrome,ClinVar,25741868,neuro
+HTT,VCV003238955,p.Thr2654=,c.7962G>A,Uncertain significance,Lopes-Maciel-Rodan syndrome,ClinVar,25741868,neuro
+HTT,VCV004278357,p.Val2617Met,c.7849G>A,Uncertain significance,Huntington disease,ClinVar,26140447,neuro
+HTT,VCV001671702,p.Val1546=,c.4638C>G,Benign/Likely benign,Huntington disease,ClinVar,28492532,neuro
+HTT,VCV003035721,p.Thr394=,c.1182C>T,Benign,HTT-related disorder,ClinVar,25741868,neuro
+HTT,VCV003045165,p.Ala2644=,c.7932C>G,Benign,HTT-related disorder,ClinVar,25741868,neuro
+NF1,VCV004796679,p.Ser1140Ter,c.3419C>G,Pathogenic,"Neurofibromatosis, type 1",ClinVar,33939658,neuro
+NF1,VCV004857610,,c.586+5G>T,Pathogenic,"Neurofibromatosis, type 1",ClinVar,33939658,neuro
+NF1,VCV004857614,,c.3871-2A>T,Pathogenic,"Neurofibromatosis, type 1",ClinVar,33939658,neuro
+NF1,VCV004861003,p.Gln2266Arg,c.6797A>G,Uncertain significance,Cardiovascular phenotype,ClinVar,25394175,neuro
+NF1,VCV004861005,p.Ala2019Gly,c.6056C>G,Uncertain significance,Cardiovascular phenotype,ClinVar,25394175,neuro
+NF1,VCV004879490,p.Leu234Arg,c.701T>G,Uncertain significance,"Neurofibromatosis, type 1",ClinVar,33939658,neuro
+NF1,VCV004718036,p.Pro869=,c.2607A>C,Benign/Likely benign,"Neurofibromatosis, type 1",ClinVar,33939658,neuro
+NF1,VCV004734794,p.Leu2703=,c.8109G>C,Benign/Likely benign,"Neurofibromatosis, type 1",ClinVar,33939658,neuro
+NF1,VCV004860970,p.Ala742=,c.2226C>T,Benign/Likely benign,Cardiovascular phenotype,ClinVar,33939658,neuro
+NF2,VCV002737024,p.Cys37Ter,c.111C>A,Pathogenic,"Neurofibromatosis, type 2",ClinVar,35802134,neuro
+NF2,VCV003234778,p.Lys515Ter,c.1543A>T,Pathogenic,"Neurofibromatosis, type 2",ClinVar,35802134,neuro
+NF2,VCV003382022,p.Glu372Ter,c.1114G>T,Pathogenic,"Neurofibromatosis, type 2",ClinVar,35802134,neuro
+NF2,VCV004743093,p.Asp511Gly,c.1532A>G,Uncertain significance,"Neurofibromatosis, type 2",ClinVar,35802134,neuro
+NF2,VCV004756872,p.Arg351Leu,c.1052G>T,Uncertain significance,"Neurofibromatosis, type 2",ClinVar,35802134,neuro
+NF2,VCV004861035,p.Lys227Arg,c.680A>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,neuro
+NF2,VCV001147317,p.Tyr177=,c.531T>C,Benign/Likely benign,Hereditary cancer-predisposing syndrome,ClinVar,35802134,neuro
+NF2,VCV001601468,,c.1447-11C>T,Benign/Likely benign,Familial meningioma,ClinVar,35802134,neuro
+NF2,VCV002496714,p.Ile68=,c.204C>T,Benign/Likely benign,"Neurofibromatosis, type 2",ClinVar,35802134,neuro
+TSC1,VCV004085150,p.Cys401Ter,c.1203T>A,Pathogenic,Tuberous sclerosis 1,ClinVar,35802134,neuro
+TSC1,VCV003780751,,c.363+668G>A,Pathogenic/Likely pathogenic,Tuberous sclerosis syndrome,ClinVar,35802134,neuro
+TSC1,VCV004277250,p.Gln843Ter,c.2527C>T,Pathogenic/Likely pathogenic,Tuberous sclerosis 1,ClinVar,35802134,neuro
+TSC1,VCV004866049,p.Lys741Asn,c.2223G>C,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,neuro
+TSC1,VCV004866050,p.Leu33Val,c.97C>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,neuro
+TSC1,VCV004866051,p.Ile555Met,c.1665A>G,Uncertain significance,Hereditary cancer-predisposing syndrome,ClinVar,25394175,neuro
+TSC1,VCV004071309,p.Gln792=,c.2376G>A,Benign/Likely benign,Hereditary cancer-predisposing syndrome,ClinVar,35802134,neuro
+TSC1,VCV004071316,p.Pro1021=,c.3063C>G,Benign/Likely benign,Hereditary cancer-predisposing syndrome,ClinVar,35802134,neuro
+TSC1,VCV004071325,p.Arg517=,c.1551G>A,Benign/Likely benign,Tuberous sclerosis 1,ClinVar,35802134,neuro
+TSC2,VCV004729704,p.Ser1420Ter,c.4259C>G,Pathogenic,Tuberous sclerosis 2,ClinVar,35802134,neuro
+TSC2,VCV004845365,p.Lys1251Met,c.3752A>T,Pathogenic,Isolated focal cortical dysplasia type II,ClinVar,25741868,neuro
+TSC2,VCV004849099,p.Cys65Ter,c.195T>A,Pathogenic,Tuberous sclerosis syndrome,ClinVar,39596632,neuro
+TSC2,VCV004879523,,c.1717-347G>T,Uncertain significance,Tuberous sclerosis 2,ClinVar,35802134,neuro
+TSC2,VCV004879596,p.Ile434Met,c.1302C>G,Uncertain significance,Tuberous sclerosis 2,ClinVar,35802134,neuro
+TSC2,VCV004880351,p.Leu706Arg,c.2117T>G,Uncertain significance,Tuberous sclerosis syndrome,ClinVar,25741868,neuro
+TSC2,VCV004071257,p.Glu138=,c.414A>G,Benign/Likely benign,Tuberous sclerosis 2,ClinVar,35802134,neuro
+TSC2,VCV004071343,p.Leu1015=,c.3045G>A,Benign/Likely benign,Tuberous sclerosis 2,ClinVar,35802134,neuro
+TSC2,VCV004071452,,c.*4C>G,Benign/Likely benign,Tuberous sclerosis syndrome,ClinVar,35802134,neuro
+PKD1,VCV004879843,p.Glu2494Ter,c.7480G>T,Pathogenic,"Polycystic kidney disease, adult type",ClinVar,20301424,renal
+PKD1,VCV004820151,p.Ser1684Ter,c.5051C>A,Pathogenic/Likely pathogenic,"Polycystic kidney disease, adult type",ClinVar,25741868,renal
+PKD1,VCV004820314,,c.12138+1G>A,Pathogenic/Likely pathogenic,"Polycystic kidney disease, adult type",ClinVar,37468838,renal
+PKD1,VCV004853443,p.Val1525Phe,c.4573G>T,Uncertain significance,"Polycystic kidney disease, adult type",ClinVar,40069205,renal
+PKD1,VCV004857246,p.Gly2436Val,c.7307G>T,Uncertain significance,"Polycystic kidney disease, adult type",ClinVar,31740684,renal
+PKD1,VCV004857288,p.Leu1499Pro,c.4496T>C,Uncertain significance,"Polycystic kidney disease, adult type",ClinVar,26823553,renal
+PKD1,VCV000993668,p.Ala1961Val,c.5882C>T,Benign/Likely benign,"Polycystic kidney disease, adult type",ClinVar,25741868,renal
+PKD1,VCV003780124,,c.10051-12C>T,Benign/Likely benign,"Polycystic kidney disease, adult type",ClinVar,25741868,renal
+PKD1,VCV000976832,,c.7066-55T>A,Benign,Autosomal dominant polycystic kidney disease,ClinVar,25741868,renal
+PKD2,VCV003780419,p.Gln323Ter,c.967C>T,Pathogenic,Polycystic kidney disease 2,ClinVar,25741868,renal
+PKD2,VCV004531949,p.Glu223Ter,c.667G>T,Pathogenic,Polycystic kidney disease 2,ClinVar,25741868,renal
+PKD2,VCV004526510,,c.843+2T>C,Pathogenic/Likely pathogenic,Polycystic kidney disease 2,ClinVar,26467025,renal
+PKD2,VCV004074507,p.Ser219Asn,c.656G>A,Uncertain significance,Inborn genetic diseases,ClinVar,31022120,renal
+PKD2,VCV004075015,p.Trp366Cys,c.1098G>T,Uncertain significance,Polycystic kidney disease 2,ClinVar,25741868,renal
+PKD2,VCV004879724,p.Gln613Pro,c.1838A>C,Uncertain significance,Polycystic kidney disease 2,ClinVar,25741868,renal
+PKD2,VCV001336016,p.Ser820=,c.2460C>T,Benign/Likely benign,Polycystic kidney disease 2,ClinVar,28492532,renal
+PKD2,VCV000976810,,c.843+57T>C,Benign,Autosomal dominant polycystic kidney disease,ClinVar,25741868,renal
+PKD2,VCV000976811,,c.1094+92A>G,Benign,Autosomal dominant polycystic kidney disease,ClinVar,25741868,renal
