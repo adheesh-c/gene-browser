@@ -59,7 +59,12 @@ POSSIBLE_POS_COLS     = ["Start","start","POS","pos","Position","position"]
 
 # NCBI etiquette
 NCBI_TOOL = "gene-browser"
-NCBI_EMAIL = st.secrets.get("NCBI_EMAIL", "")
+# st.secrets raises StreamlitSecretNotFoundError when no secrets.toml exists anywhere,
+# so guard it and fall back to an env var (keeps the app working with no secrets configured).
+try:
+    NCBI_EMAIL = st.secrets.get("NCBI_EMAIL", "")
+except Exception:
+    NCBI_EMAIL = os.environ.get("NCBI_EMAIL", "")
 
 # ----------------------------
 # Gene summaries (hardcoded for common educational genes; NCBI API fallback for others)
@@ -438,9 +443,9 @@ def render_home():
     with st.expander("Quick Start Guide (First Time Users)", expanded=True):
         st.markdown("""
         1. **Click "Tool" in the navigation bar above**
-        2. **Try searching for "BRCA1"** - a well-studied gene
-        3. **Look at the results table** - each row is a different variant
-        4. **Click "Generate cards"** at the bottom to see easy-to-read summaries
+        2. **Try searching for "BRCA1"** - a well-studied gene, or pick a theme (e.g. Brain tumor genes)
+        3. **Read the plain-language cards** that appear automatically for the top variants
+        4. **Open "Show full data table"** if you want the detailed, color-coded rows
         5. **Use the sidebar filters** to narrow down results by disease or significance
 
         **Don't understand the terms?** Check out the "About" page for explanations!
@@ -459,9 +464,9 @@ def render_home():
 <h3>How to use it</h3>
 <ol>
   <li>Click <b>Tool</b> in the top bar.</li>
-  <li>Type a gene like <b>BRCA1</b>.</li>
-  <li>Filter by condition or clinical significance.</li>
-  <li>Generate cards for readable summaries.</li>
+  <li>Type a gene like <b>BRCA1</b>, or pick a theme.</li>
+  <li>Read the plain-language cards that appear automatically.</li>
+  <li>Filter by condition or significance, or open the full data table.</li>
 </ol>
 
 <p><b>Disclaimer:</b> Educational only. Not medical advice.</p>
@@ -642,6 +647,30 @@ def _normalize_sig_category(val: str) -> str:
     return "Other"
 
 
+# ----------------------------
+# Themed collections (M1 `collection` column) -> one-click starting points
+# ----------------------------
+COLLECTION_LABELS = {
+    "brain_tumor": "🧠 Brain tumor genes",
+    "hereditary_cancer": "🎗️ Cancer risk genes",
+    "neuro": "🧩 Neurological genes",
+    "metabolic": "⚗️ Metabolic conditions",
+    "renal": "🫘 Kidney genes",
+}
+
+def _collections_map(df: pd.DataFrame) -> dict:
+    """Map each collection -> sorted list of its genes, from the dataset's `collection` column."""
+    if "collection" not in df.columns or "gene" not in df.columns:
+        return {}
+    out = {}
+    sub = df.dropna(subset=["collection"])
+    for coll in sorted(sub["collection"].unique().tolist()):
+        genes = sorted(sub[sub["collection"] == coll]["gene"].dropna().unique().tolist())
+        if genes:
+            out[str(coll)] = genes
+    return out
+
+
 def render_tool():
     # Sidebar only on tool page
     with st.sidebar:
@@ -784,8 +813,24 @@ def render_tool():
                 st.caption(gene_descriptions[g])
 
         st.markdown("---")
-        st.markdown("** Tip:** After searching, click 'Generate cards' to see easy-to-read summaries!")
+        st.markdown("**Tip:** Pick any gene above or a theme below — plain-language cards appear automatically.")
         st.markdown("</div>", unsafe_allow_html=True)
+
+        # Start here — themed one-click entry points from the dataset's `collection` column
+        coll_map = _collections_map(df_live)
+        if coll_map:
+            st.markdown("### 🚀 Start here — explore by theme")
+            st.caption("Pick a theme, then a gene, to jump straight to beginner-friendly cards.")
+            for coll, genes in coll_map.items():
+                label = COLLECTION_LABELS.get(coll, coll.replace("_", " ").title())
+                st.markdown(f"**{label}**")
+                bcols = st.columns(6)
+                for i, g in enumerate(genes):
+                    with bcols[i % 6]:
+                        if st.button(g, key=f"coll_{coll}_{g}"):
+                            st.session_state["query"] = g
+                            _set_params_keep_page(g, st.session_state.get("selected_sigs", []), st.session_state.get("selected_conditions", []))
+                            st.rerun()
         return
 
     # Fuzzy suggestions
@@ -828,15 +873,37 @@ def render_tool():
             history = [query] + history
         st.session_state["search_history"] = history[:10]
 
+    # ---- Friendly, actionable empty states (never a bare "No variants found") ----
+    if results.empty:
+        gene_vals = set(df_live["gene"].dropna().unique()) if "gene" in df_live.columns else set()
+        if query not in gene_vals:
+            st.info(f"We don't have **{query}** in this teaching set yet — try one of these:")
+            picks = fuzzy_gene_candidates(query, gene_options, limit=5) or ["BRCA1", "TP53", "CFTR", "APOE", "IDH1"]
+            pcols = st.columns(len(picks))
+            for i, g in enumerate(picks):
+                if pcols[i].button(g, key=f"empty_pick_{g}"):
+                    st.session_state["query"] = g
+                    _set_params_keep_page(g, st.session_state.get("selected_sigs", []), st.session_state.get("selected_conditions", []))
+                    st.rerun()
+            st.caption("Or clear the search box to browse all genes grouped by theme.")
+        else:
+            st.warning(f"**{query}** is in the teaching set, but no variants match your current filters.")
+            if st.button(f"Clear filters and show all {query} variants"):
+                st.session_state["selected_sigs"] = []
+                st.session_state["selected_conditions"] = []
+                _set_params_keep_page(query, [], [])
+                st.rerun()
+        return
+
     # Metrics
     left, right = st.columns(2)
     with left:
         st.metric("Matches", len(results))
     with right:
-        st.metric("Unique conditions", results["condition"].nunique() if not results.empty else 0)
+        st.metric("Unique conditions", results["condition"].nunique())
 
     # Pathogenicity breakdown chart
-    if not results.empty and "clinical_significance" in results.columns:
+    if "clinical_significance" in results.columns:
         cats = results["clinical_significance"].dropna().map(_normalize_sig_category)
         order = ["Pathogenic", "Likely Pathogenic", "VUS", "Conflicting", "Likely Benign", "Benign", "Other"]
         counts = cats.value_counts().reindex(order, fill_value=0)
@@ -859,6 +926,105 @@ def render_tool():
                 except (ValueError, TypeError):
                     pass
 
+    # ---- Plain-language cards FIRST (auto-rendered for the top results) ----
+    st.markdown("### 🧬 Plain-language variant cards")
+    st.caption("Beginner-friendly summaries of the top matching variants, with a one-sentence "
+               "PubMed research note when available. Educational only — not medical advice.")
+
+    max_cards = min(10, len(results))
+    n_cards = st.number_input(
+        "How many cards to show",
+        min_value=1, max_value=max_cards, value=min(3, max_cards), step=1,
+        help="Cards load automatically. Increase this to see more variants."
+    )
+
+    with st.spinner("Building plain-language cards..."):
+        cards = build_variant_cards(results, query, n=int(n_cards))
+    gene_context = GENE_SUMMARIES.get(query, "")
+    for i, c in enumerate(cards, 1):
+        st.markdown("---")
+        st.markdown(f"**Variant {i}: {c['Mutation']}**")
+
+        if c['Mutation'].startswith('p.'):
+            st.caption("💡 'p.' means this describes a change in the protein (the building blocks that do the work)")
+        elif c['Mutation'].startswith('c.'):
+            st.caption("💡 'c.' means this describes a change in the DNA code")
+
+        st.markdown(f"- **Disease/Phenotype:** {c['Disease/Phenotype']}")
+
+        sig = c['Clinical significance']
+        sig_explanation = {
+            'Pathogenic': '⚠️ This variant is known to cause disease',
+            'Likely Pathogenic': '⚠️ This variant is strongly suspected to cause disease',
+            'Benign': '✅ This variant does not cause disease',
+            'Likely Benign': '✅ This variant is unlikely to cause disease',
+            'VUS': '❓ The significance of this variant is uncertain - more research is needed',
+            'Variant of Uncertain Significance': '❓ The significance of this variant is uncertain - more research is needed'
+        }.get(sig, '')
+
+        if sig_explanation:
+            st.markdown(f"- **Clinical significance:** {sig} — {sig_explanation}")
+        else:
+            st.markdown(f"- **Clinical significance:** {sig}")
+
+        if c["PMID"] != "—":
+            st.markdown(f"- **Research paper:** [PMID {c['PMID']}](https://pubmed.ncbi.nlm.nih.gov/{c['PMID']}/) (click to read the original study)")
+        else:
+            st.caption("No research paper found for this variant.")
+
+        st.markdown(f"**Summary:** {c['Summary']}")
+
+        # Why does this matter?
+        sig_lower = sig.lower()
+        disease = c["Disease/Phenotype"]
+        why_parts = []
+        if "pathogenic" in sig_lower and "benign" not in sig_lower:
+            if disease and disease != "Not specified":
+                why_parts.append(f"This variant is classified as **{sig}**, meaning it is linked to an increased risk of **{disease}**.")
+            else:
+                why_parts.append(f"This variant is classified as **{sig}**, meaning it may contribute to disease.")
+            if gene_context:
+                why_parts.append(f"**About {query}:** {gene_context}")
+        elif "benign" in sig_lower:
+            why_parts.append(f"This variant is classified as **{sig}** — the {query} gene still functions normally despite this DNA change.")
+        elif "uncertain" in sig_lower or "vus" in sig_lower:
+            why_parts.append("This variant's impact is **uncertain** (Variant of Uncertain Significance). Scientists need more evidence to determine whether it causes disease.")
+            if disease and disease != "Not specified":
+                why_parts.append(f"It has been observed in people with {disease}, but this association alone does not confirm it as the cause.")
+
+        if why_parts:
+            with st.expander("Why does this matter?"):
+                for part in why_parts:
+                    st.markdown(part)
+
+    # ---- Full data table (advanced view, behind a reveal) ----
+    preferred_cols = ["gene", "variant_id", "protein_change", "cdna_change",
+                      "clinical_significance", "condition", "source", "PMID", "collection"]
+    ordered_cols = [c for c in preferred_cols if c in results.columns] + [c for c in results.columns if c not in preferred_cols]
+
+    with st.expander("📊 Show full data table", expanded=False):
+        st.markdown("""
+        **Understanding the results table:**
+        - Each row represents a different variant (change) in the gene
+        - Color coding: Red/Orange = disease-causing, Green = not disease-causing, Purple = unknown
+        - Click on PMID numbers to read the original research paper
+        - Use filters in the sidebar to narrow results
+        """)
+
+        if "clinical_significance" in ordered_cols:
+            styled_df = results[ordered_cols].style.map(color_significance, subset=['clinical_significance'])
+            st.dataframe(styled_df, width="stretch", hide_index=True)
+        else:
+            st.dataframe(results[ordered_cols], width="stretch", hide_index=True)
+
+        csv_bytes = results[ordered_cols].to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇️ Download these results (CSV) — for a worksheet or slide",
+            data=csv_bytes,
+            file_name=f"{query}_variants.csv",
+            mime="text/csv",
+        )
+
     # Share section
     with st.expander("Share"):
         st.write("Copy the link from your browser address bar to share this search + filters.")
@@ -878,104 +1044,6 @@ def render_tool():
                 "Replace `your-app.streamlit.app` with your deployment URL. "
                 "The `?embed=true` parameter hides the Streamlit toolbar for a cleaner classroom view."
             )
-
-    # Table
-    if results.empty:
-        st.warning("No variants found. Try removing filters or check the gene symbol.")
-        return
-
-    st.markdown("""
-    **Understanding the results table:**
-    - Each row represents a different variant (change) in the gene
-    - Color coding: Red/Orange = disease-causing, Green = not disease-causing, Purple = unknown
-    - Click on PMID numbers to read the original research paper
-    - Use filters in the sidebar to narrow results
-    """)
-
-    preferred_cols = ["gene", "variant_id", "protein_change", "cdna_change",
-                      "clinical_significance", "condition", "source", "PMID"]
-    ordered_cols = [c for c in preferred_cols if c in results.columns] + [c for c in results.columns if c not in preferred_cols]
-
-    if "clinical_significance" in ordered_cols:
-        styled_df = results[ordered_cols].style.map(color_significance, subset=['clinical_significance'])
-        st.dataframe(styled_df, width="stretch", hide_index=True)
-    else:
-        st.dataframe(results[ordered_cols], width="stretch", hide_index=True)
-
-    csv_bytes = results[ordered_cols].to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="Download results (CSV)",
-        data=csv_bytes,
-        file_name=f"{query}_variants.csv",
-        mime="text/csv",
-    )
-
-    # Cards
-    with st.expander("🧬 Variant cards with PubMed summary", expanded=True):
-        c1, c2 = st.columns([1,5])
-        with c1:
-            n_cards = st.number_input("How many", min_value=1, max_value=5, value=3, step=1)
-        with c2:
-            st.caption("Each card includes a one-sentence summary extracted from PubMed when available.")
-
-        if st.button("Generate cards"):
-            cards = build_variant_cards(df_live, query, n=int(n_cards))
-            gene_context = GENE_SUMMARIES.get(query, "")
-            for i, c in enumerate(cards, 1):
-                st.markdown("---")
-                st.markdown(f"**Variant {i}: {c['Mutation']}**")
-
-                if c['Mutation'].startswith('p.'):
-                    st.caption("💡 'p.' means this describes a change in the protein (the building blocks that do the work)")
-                elif c['Mutation'].startswith('c.'):
-                    st.caption("💡 'c.' means this describes a change in the DNA code")
-
-                st.markdown(f"- **Disease/Phenotype:** {c['Disease/Phenotype']}")
-
-                sig = c['Clinical significance']
-                sig_explanation = {
-                    'Pathogenic': '⚠️ This variant is known to cause disease',
-                    'Likely Pathogenic': '⚠️ This variant is strongly suspected to cause disease',
-                    'Benign': '✅ This variant does not cause disease',
-                    'Likely Benign': '✅ This variant is unlikely to cause disease',
-                    'VUS': '❓ The significance of this variant is uncertain - more research is needed',
-                    'Variant of Uncertain Significance': '❓ The significance of this variant is uncertain - more research is needed'
-                }.get(sig, '')
-
-                if sig_explanation:
-                    st.markdown(f"- **Clinical significance:** {sig} — {sig_explanation}")
-                else:
-                    st.markdown(f"- **Clinical significance:** {sig}")
-
-                if c["PMID"] != "—":
-                    st.markdown(f"- **Research paper:** [PMID {c['PMID']}](https://pubmed.ncbi.nlm.nih.gov/{c['PMID']}/) (click to read the original study)")
-                else:
-                    st.caption("No research paper found for this variant.")
-
-                st.markdown(f"**Summary:** {c['Summary']}")
-
-                # Why does this matter?
-                sig_lower = sig.lower()
-                disease = c["Disease/Phenotype"]
-                why_parts = []
-                if "pathogenic" in sig_lower and "benign" not in sig_lower:
-                    if disease and disease != "Not specified":
-                        why_parts.append(f"This variant is classified as **{sig}**, meaning it is linked to an increased risk of **{disease}**.")
-                    else:
-                        why_parts.append(f"This variant is classified as **{sig}**, meaning it may contribute to disease.")
-                    if gene_context:
-                        why_parts.append(f"**About {query}:** {gene_context}")
-                elif "benign" in sig_lower:
-                    why_parts.append(f"This variant is classified as **{sig}** — the {query} gene still functions normally despite this DNA change.")
-                elif "uncertain" in sig_lower or "vus" in sig_lower:
-                    why_parts.append("This variant's impact is **uncertain** (Variant of Uncertain Significance). Scientists need more evidence to determine whether it causes disease.")
-                    if disease and disease != "Not specified":
-                        why_parts.append(f"It has been observed in people with {disease}, but this association alone does not confirm it as the cause.")
-
-                if why_parts:
-                    with st.expander("Why does this matter?"):
-                        for part in why_parts:
-                            st.markdown(part)
 
 # ----------------------------
 # Render selected page
