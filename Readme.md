@@ -21,6 +21,12 @@ Built with [Streamlit](https://streamlit.io) and Python.
   of the relevant research, generated from PubMed abstracts via the NCBI
   E-utilities API (with a small hand-written glossary for well-known genes
   like BRCA1, TP53, and CFTR).
+- **AI-assisted plain-language summaries (optional)** — when an
+  `ANTHROPIC_API_KEY` is configured, variant cards can rewrite the research
+  note at roughly an 8th-grade reading level using Claude. Output is labeled
+  "AI-assisted," constrained to explain-only (no medical advice, no personal
+  risk), cached, and generated on demand. Without a key the app falls back to
+  the template summary and works exactly as before.
 - **Generate shareable "cards"** for individual variants, and export search
   results as CSV.
 - **Learn the vocabulary** — an About page explains variant notation
@@ -69,9 +75,11 @@ Streamlit Cloud auto-redeploys on every push to `main`.
   `gene-browser` — worth remembering when looking it up in the Streamlit
   Cloud dashboard)
 - **Repo/branch:** `adheesh-c/gene-browser` @ `main`
-- **Secrets configured on Streamlit Cloud:** `NCBI_EMAIL` (see
-  `.streamlit/secrets.toml.example` for the format) — optional, but polite
-  to NCBI's API etiquette rules.
+- **Secrets configured on Streamlit Cloud:** `NCBI_EMAIL` (optional, but polite
+  to NCBI's API etiquette rules) and, optionally, `ANTHROPIC_API_KEY` /
+  `ANTHROPIC_MODEL` to enable AI-assisted summaries. See
+  `.streamlit/secrets.toml.example` for the format. All are optional — the app
+  runs fully without any of them.
 
 ### How to (re)deploy
 

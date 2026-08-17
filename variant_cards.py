@@ -174,6 +174,62 @@ def build_one_sentence_fallback(gene: str, cdna: Optional[str], prot: Optional[s
     return txt
 
 
+# --- LLM plain-language summarizer (M5) ---
+# Guardrail prompt: explain-only, no medical advice, no personal risk, grade-8, 1-2 sentences.
+AI_SUMMARY_SYSTEM = (
+    "You are a science educator helping beginners (students, families, and teachers) understand "
+    "genetic variants. You are given facts about ONE gene variant plus a sentence or two from a "
+    "research abstract. Rewrite it as a clear, plain-language explanation at a US 8th-grade reading level.\n\n"
+    "Strict rules you must always follow:\n"
+    "- Explain and simplify ONLY. Never give medical advice, recommendations, or next steps.\n"
+    "- Never estimate any individual person's risk or chance of getting a disease.\n"
+    "- Do not diagnose. Describe the biology in general, educational terms.\n"
+    "- Keep it to 1-2 short sentences. Avoid jargon, or define it in plain words.\n"
+    "- If the clinical significance is 'Uncertain', make clear that scientists do not yet know "
+    "whether this change causes disease.\n"
+    "- This is educational information, not medical advice.\n"
+    "- Output ONLY the summary sentence(s) — no preamble, headings, bullets, or quotation marks."
+)
+
+
+def ai_plain_language_summary(gene, variant, condition, significance, abstract,
+                             *, api_key=None, model="claude-opus-4-8", timeout=20.0):
+    """Turn variant context + an abstract sentence into a grade-8, 1-2 sentence summary.
+
+    Returns the summary string, or None if the API key is missing, the SDK is unavailable,
+    or the call fails — callers must fall back to the deterministic template summary so the
+    app fully works with AI disabled.
+    """
+    key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        return None
+    try:
+        import anthropic
+    except Exception:
+        return None
+    try:
+        client = anthropic.Anthropic(api_key=key, timeout=timeout)
+        user = (
+            f"Gene: {gene or 'unknown'}\n"
+            f"Variant: {variant or 'unspecified'}\n"
+            f"Condition: {condition or 'not specified'}\n"
+            f"Clinical significance: {significance or 'not specified'}\n"
+            f"Research note: {abstract or '(none available)'}\n\n"
+            "Write the plain-language summary."
+        )
+        resp = client.messages.create(
+            model=model or "claude-opus-4-8",
+            max_tokens=200,
+            thinking={"type": "disabled"},
+            system=AI_SUMMARY_SYSTEM,
+            messages=[{"role": "user", "content": user}],
+        )
+        text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
+        return text or None
+    except Exception:
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser(description="Print 2–3 variant cards from a ClinVar file for a given gene.")
     ap.add_argument("--gene", required=True, help="Gene symbol, e.g. BRCA1")

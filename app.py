@@ -67,6 +67,30 @@ except Exception:
     NCBI_EMAIL = os.environ.get("NCBI_EMAIL", "")
 
 # ----------------------------
+# Optional AI summarizer (M5) — key + model from secrets, env-var fallback.
+# The app fully works with AI disabled (no key -> deterministic template summaries).
+# ----------------------------
+from variant_cards import ai_plain_language_summary
+
+def _secret_or_env(name, default=""):
+    try:
+        return st.secrets.get(name, "") or os.environ.get(name, "") or default
+    except Exception:
+        return os.environ.get(name, "") or default
+
+ANTHROPIC_API_KEY = _secret_or_env("ANTHROPIC_API_KEY")
+ANTHROPIC_MODEL = _secret_or_env("ANTHROPIC_MODEL", "claude-opus-4-8")
+AI_ENABLED = bool(ANTHROPIC_API_KEY)
+
+@st.cache_data(ttl=60*60*24*7, show_spinner=False)
+def get_ai_summary(gene, variant, condition, significance, abstract, model):
+    """Cached wrapper so the same variant isn't re-summarized every run."""
+    return ai_plain_language_summary(
+        gene, variant, condition, significance, abstract,
+        api_key=ANTHROPIC_API_KEY, model=model,
+    )
+
+# ----------------------------
 # Gene summaries (hardcoded for common educational genes; NCBI API fallback for others)
 # ----------------------------
 GENE_SUMMARIES = {
@@ -1104,6 +1128,18 @@ def render_tool():
         help="Cards load automatically. Increase this to see more variants."
     )
 
+    if AI_ENABLED:
+        use_ai = st.checkbox(
+            "✨ AI-assisted plain-language summaries",
+            value=True,
+            help="Uses an LLM to rewrite the research note at about an 8th-grade reading level. "
+                 "Results are cached. Educational only — not medical advice.",
+        )
+    else:
+        use_ai = False
+        st.caption("💡 Tip: add an `ANTHROPIC_API_KEY` in secrets to enable AI-assisted "
+                   "plain-language summaries. The tool works fully without it.")
+
     with st.spinner("Building plain-language cards..."):
         cards = build_variant_cards(results, query, n=int(n_cards))
     gene_context = GENE_SUMMARIES.get(query, "")
@@ -1138,7 +1174,19 @@ def render_tool():
         else:
             st.caption("No research paper found for this variant.")
 
-        st.markdown(f"**Summary:** {c['Summary']}")
+        # Plain-language summary: AI-assisted when enabled, else the deterministic template.
+        ai_summary = None
+        if use_ai:
+            with st.spinner("Writing a plain-language summary..."):
+                ai_summary = get_ai_summary(
+                    query, c["Mutation"], c["Disease/Phenotype"],
+                    c["Clinical significance"], c["Summary"], ANTHROPIC_MODEL,
+                )
+        if ai_summary:
+            st.markdown("**✨ AI-assisted plain-language summary** — _explains public info only; not medical advice_")
+            st.markdown(ai_summary)
+        else:
+            st.markdown(f"**Summary:** {c['Summary']}")
 
         # Why does this matter?
         sig_lower = sig.lower()

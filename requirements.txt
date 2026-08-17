@@ -2,3 +2,4 @@ streamlit>=1.36
 pandas>=2.0
 rapidfuzz>=3.0
 requests>=2.31
+anthropic>=0.69  # optional: AI-assisted plain-language summaries (app works without a key)
