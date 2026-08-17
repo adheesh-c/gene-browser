@@ -230,6 +230,50 @@ def ai_plain_language_summary(gene, variant, condition, significance, abstract,
         return None
 
 
+# --- Readability scoring (M6) ---
+def _count_syllables(word):
+    """Rough English syllable count (vowel groups), min 1 for any alphabetic word."""
+    w = re.sub(r"[^a-z]", "", word.lower())
+    if not w:
+        return 0
+    groups = re.findall(r"[aeiouy]+", w)
+    count = len(groups)
+    if w.endswith("e") and count > 1:  # silent trailing 'e'
+        count -= 1
+    return max(1, count)
+
+
+def reading_grade(text):
+    """Flesch–Kincaid grade level for a short summary.
+
+    Uses the `textstat` library when available (more accurate), otherwise a small
+    built-in formula. Returns a float grade, or None if the text is empty/too short.
+    Degrades silently — never raises. Note: readability formulas are rough on
+    scientific text (long gene names inflate syllable counts), so treat the number
+    as indicative, not exact.
+    """
+    text = (text or "").strip()
+    if len(text) < 3:
+        return None
+    try:
+        import textstat
+        return round(max(0.0, float(textstat.flesch_kincaid_grade(text))), 1)
+    except Exception:
+        pass
+    try:
+        sentences = [s for s in re.split(r"[.!?]+", text) if s.strip()]
+        n_sent = max(1, len(sentences))
+        words = re.findall(r"[A-Za-z']+", text)
+        n_words = len(words)
+        if n_words == 0:
+            return None
+        n_syll = sum(_count_syllables(w) for w in words)
+        fk = 0.39 * (n_words / n_sent) + 11.8 * (n_syll / n_words) - 15.59
+        return round(max(0.0, fk), 1)
+    except Exception:
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser(description="Print 2–3 variant cards from a ClinVar file for a given gene.")
     ap.add_argument("--gene", required=True, help="Gene symbol, e.g. BRCA1")

@@ -70,7 +70,7 @@ except Exception:
 # Optional AI summarizer (M5) — key + model from secrets, env-var fallback.
 # The app fully works with AI disabled (no key -> deterministic template summaries).
 # ----------------------------
-from variant_cards import ai_plain_language_summary
+from variant_cards import ai_plain_language_summary, reading_grade
 
 def _secret_or_env(name, default=""):
     try:
@@ -89,6 +89,23 @@ def get_ai_summary(gene, variant, condition, significance, abstract, model):
         gene, variant, condition, significance, abstract,
         api_key=ANTHROPIC_API_KEY, model=model,
     )
+
+def _record_ai_reading_grade(grade):
+    """Accumulate reading grades of AI summaries so the average can be surfaced."""
+    if grade is None:
+        return
+    grades = st.session_state.setdefault("ai_reading_grades", [])
+    grades.append(float(grade))
+
+def average_ai_reading_grade():
+    """Mean Flesch–Kincaid grade of AI summaries shown this session (or None).
+
+    Exposed for the Impact tab (M10) to surface as evidence the tool is accessible.
+    """
+    grades = st.session_state.get("ai_reading_grades", [])
+    if not grades:
+        return None
+    return round(sum(grades) / len(grades), 1)
 
 # ----------------------------
 # Gene summaries (hardcoded for common educational genes; NCBI API fallback for others)
@@ -1182,11 +1199,19 @@ def render_tool():
                     query, c["Mutation"], c["Disease/Phenotype"],
                     c["Clinical significance"], c["Summary"], ANTHROPIC_MODEL,
                 )
+        shown_summary = ai_summary or c["Summary"]
         if ai_summary:
             st.markdown("**✨ AI-assisted plain-language summary** — _explains public info only; not medical advice_")
             st.markdown(ai_summary)
         else:
             st.markdown(f"**Summary:** {c['Summary']}")
+
+        # Readability scoring (M6): grade the summary shown; badge only in Teacher mode.
+        grade = reading_grade(shown_summary)
+        if ai_summary:
+            _record_ai_reading_grade(grade)
+        if teacher_mode and grade is not None:
+            st.caption(f"📖 Reading level: Grade {grade} — indicative only (rough on scientific terms)")
 
         # Why does this matter?
         sig_lower = sig.lower()
@@ -1210,6 +1235,16 @@ def render_tool():
             with st.expander("Why does this matter?"):
                 for part in why_parts:
                     st.markdown(part)
+
+    # Teacher-mode readability readout (M6): average grade of AI summaries this session.
+    if teacher_mode:
+        avg_grade = average_ai_reading_grade()
+        if avg_grade is not None:
+            st.caption(
+                f"👩‍🏫 Average AI-summary reading level this session: **Grade {avg_grade}** "
+                f"(across {len(st.session_state.get('ai_reading_grades', []))} summaries). "
+                "Indicative metric for the Impact tab — lower is more accessible."
+            )
 
     # ---- Full data table (advanced view, behind a reveal) ----
     preferred_cols = ["gene", "variant_id", "protein_change", "cdna_change",
