@@ -94,6 +94,38 @@ GENE_SUMMARIES = {
     "KRAS": "KRAS encodes a GTPase central to growth factor signaling from cell-surface receptors. Somatic KRAS mutations are among the most frequent in human cancers, including pancreatic, colorectal, and lung adenocarcinoma.",
 }
 
+# ----------------------------
+# "Why this matters" hooks (M4) — one neutral, plain-language line per gene.
+# Educational framing about the science/history; no personal-risk or diagnostic language.
+# ----------------------------
+GENE_WHY_MATTERS = {
+    "BRCA1": "A landmark in cancer genetics — studying BRCA1 helped scientists learn how inherited changes in DNA-repair genes are researched and discussed with families.",
+    "BRCA2": "Discovered soon after BRCA1, BRCA2 helped show that more than one gene can affect the same DNA-repair process that cells rely on.",
+    "TP53": "Nicknamed the “guardian of the genome,” TP53 is one of the most studied genes in all of biology because of its central role in protecting cells.",
+    "CFTR": "A famous example in genetics: research on CFTR led to newer therapies that target the underlying biology of cystic fibrosis, not just its symptoms.",
+    "HTT": "A well-known teaching example of how scientists study repeat changes in DNA and how a single gene can be connected to a condition.",
+    "APOE": "One of the most talked-about genes in aging research, because of its connection to how the brain and body handle fats and cholesterol.",
+    "LDLR": "Research on LDLR revealed how the body clears cholesterol from the blood — knowledge that shaped modern heart-health science.",
+    "RB1": "The first gene of its kind to be identified, RB1 helped launch the entire field of studying “tumor suppressor” genes.",
+    "APC": "A classic teaching example of how one gene can influence the growth signals cells use to decide when to divide.",
+    "MLH1": "MLH1 helped scientists understand “proofreading” during DNA copying — a key idea in how cells keep their instructions accurate.",
+    "PTEN": "Widely studied as an example of a gene that helps cells keep their own growth signals in balance.",
+    "VHL": "VHL research revealed how cells sense and respond to oxygen levels — work so important it earned a Nobel Prize.",
+    "NF1": "A well-known gene in neuroscience, often used to explain how a single gene can affect many different parts of the body.",
+    "NF2": "Helps scientists study how certain cells in the nervous system are kept from growing when they shouldn’t.",
+    "TSC1": "Part of a famous cell-growth “switch” (the mTOR pathway) that is central to a great deal of modern biology.",
+    "TSC2": "Works together with TSC1 in the same growth-control switch — a key discovery for understanding how cells manage their size and number.",
+    "PKD1": "The most-studied gene in inherited kidney research, and a window into how kidney tubules stay organized.",
+    "PKD2": "Partners with PKD1 and helps scientists understand the cell-to-cell signaling that keeps kidneys working.",
+    "HEXA": "A historic example in genetics that helped establish community screening and genetic counseling as public-health tools.",
+    "PAH": "A public-health success story: understanding PAH is why newborns are screened, so a simple diet change can prevent harm.",
+    "MUTYH": "Helps scientists study how cells repair everyday “wear and tear” damage that DNA picks up from normal metabolism.",
+    "KRAS": "One of the most-studied genes in cancer research and a major focus of modern, precisely targeted drug development.",
+    "IDH1": "An important gene in brain-tumor research that has helped scientists classify gliomas more precisely.",
+    "EGFR": "A landmark in “targeted therapy” — it showed how understanding one specific gene can guide treatment research.",
+    "ATRX": "Studied in brain-tumor and developmental research for its role in keeping DNA properly packaged inside cells.",
+}
+
 @st.cache_data(ttl=60*60*24, show_spinner=False)
 def fetch_ncbi_gene_summary(gene_symbol: str) -> str | None:
     try:
@@ -374,6 +406,11 @@ st.markdown("""
   padding: 1rem 1.2rem; border-radius: 12px;
   background: #f0f4ff; border-left: 4px solid #4f46e5;
   margin-bottom: 1rem;
+}
+.why-box {
+  padding: 0.75rem 1rem; border-radius: 12px;
+  background: #fff8ef; border-left: 4px solid #f59e0b;
+  margin: -0.5rem 0 1rem; font-size: 0.95rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -975,6 +1012,16 @@ def render_tool():
             f'<div class="gene-info-box"><b>{query}</b> — {gene_blurb}</div>',
             unsafe_allow_html=True
         )
+
+    # "Why this matters" hook (M4), shown right below the gene summary.
+    why = GENE_WHY_MATTERS.get(query) or (
+        "Genes carry the instructions cells use to build proteins — scientists study "
+        "genes like this to understand how the body works."
+    )
+    st.markdown(
+        f'<div class="why-box"><b>💡 Why this matters:</b> {why}</div>',
+        unsafe_allow_html=True
+    )
 
     # Filter + apply sidebar filters
     results = filter_variants(df_live, query)
