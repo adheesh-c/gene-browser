@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-import time, re, os
+import time, re, os, base64
 from typing import Optional, Tuple, List
 import requests
 
@@ -433,11 +433,121 @@ st.markdown("---")
 variants_df = canonicalize_columns(load_variants(DATA_PATH))
 
 # ----------------------------
+# Reusable visual explainer (M3): DNA -> gene -> protein + single-letter change
+# ----------------------------
+GENE_EXPLAINER_SVG = r'''
+<svg viewBox="0 0 720 470" width="100%" role="img"
+     xmlns="http://www.w3.org/2000/svg"
+     font-family="'Segoe UI', system-ui, -apple-system, sans-serif"
+     aria-label="How DNA becomes a protein. 1: a chromosome is a package of DNA that contains genes. 2: a gene is a stretch of DNA letters (A, T, G, C). 3: the cell reads the gene to build a protein, a folded chain of amino-acid beads. Changing a single DNA letter can change the protein, just like changing CAT into BAT.">
+  <rect x="1" y="1" width="718" height="468" rx="16" fill="#f5f6ff" stroke="#e9ecff"/>
+
+  <!-- arrowhead -->
+  <defs>
+    <marker id="ge_arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#1f2340"/>
+    </marker>
+  </defs>
+
+  <!-- STAGE 1: Chromosome -->
+  <text x="120" y="42" text-anchor="middle" font-size="19" font-weight="700" fill="#1f2340">1 &#183; Chromosome</text>
+  <g stroke="#4f46e5" stroke-width="20" stroke-linecap="round">
+    <line x1="86" y1="78" x2="154" y2="190"/>
+    <line x1="154" y1="78" x2="86" y2="190"/>
+  </g>
+  <rect x="101" y="120" width="38" height="28" rx="5" fill="#ffffff" stroke="#1f2340" stroke-width="3"/>
+  <text x="120" y="228" text-anchor="middle" font-size="15" fill="#1f2340">a package of DNA</text>
+  <text x="120" y="248" text-anchor="middle" font-size="14" font-weight="700" fill="#4f46e5">the box = one gene</text>
+
+  <!-- arrow 1 -> 2 -->
+  <line x1="178" y1="130" x2="236" y2="130" stroke="#1f2340" stroke-width="3" marker-end="url(#ge_arrow)"/>
+  <text x="207" y="118" text-anchor="middle" font-size="13" fill="#555">zoom in</text>
+
+  <!-- STAGE 2: Gene = DNA letters -->
+  <text x="360" y="42" text-anchor="middle" font-size="19" font-weight="700" fill="#1f2340">2 &#183; Gene</text>
+  <g font-family="'Courier New', monospace" font-size="22" font-weight="700" text-anchor="middle" fill="#1f2340">
+    <rect x="252" y="104" width="34" height="44" rx="5" fill="#ffffff" stroke="#c7cbe6" stroke-width="2"/><text x="269" y="134">A</text>
+    <rect x="290" y="104" width="34" height="44" rx="5" fill="#ffffff" stroke="#c7cbe6" stroke-width="2"/><text x="307" y="134">T</text>
+    <rect x="328" y="104" width="34" height="44" rx="5" fill="#ffffff" stroke="#c7cbe6" stroke-width="2"/><text x="345" y="134">G</text>
+    <rect x="366" y="104" width="34" height="44" rx="5" fill="#eef0ff" stroke="#1f2340" stroke-width="4"/><text x="383" y="134">C</text>
+    <rect x="404" y="104" width="34" height="44" rx="5" fill="#ffffff" stroke="#c7cbe6" stroke-width="2"/><text x="421" y="134">A</text>
+    <rect x="442" y="104" width="34" height="44" rx="5" fill="#ffffff" stroke="#c7cbe6" stroke-width="2"/><text x="459" y="134">T</text>
+  </g>
+  <text x="383" y="170" text-anchor="middle" font-size="13" font-weight="700" fill="#4f46e5">one letter</text>
+  <text x="360" y="228" text-anchor="middle" font-size="15" fill="#1f2340">a stretch of DNA letters</text>
+  <text x="360" y="248" text-anchor="middle" font-size="14" fill="#1f2340">(A, T, G, C)</text>
+
+  <!-- arrow 2 -> 3 -->
+  <line x1="492" y1="130" x2="548" y2="130" stroke="#1f2340" stroke-width="3" marker-end="url(#ge_arrow)"/>
+  <text x="520" y="118" text-anchor="middle" font-size="13" fill="#555">builds</text>
+
+  <!-- STAGE 3: Protein -->
+  <text x="612" y="42" text-anchor="middle" font-size="19" font-weight="700" fill="#1f2340">3 &#183; Protein</text>
+  <polyline points="565,150 590,112 618,150 646,112 672,140" fill="none" stroke="#4f46e5" stroke-width="4"/>
+  <g fill="#ffffff" stroke="#4f46e5" stroke-width="4">
+    <circle cx="565" cy="150" r="13"/>
+    <circle cx="590" cy="112" r="13"/>
+    <circle cx="646" cy="112" r="13"/>
+    <circle cx="672" cy="140" r="13"/>
+  </g>
+  <circle cx="618" cy="150" r="14" fill="#eef0ff" stroke="#1f2340" stroke-width="4"/>
+  <text x="612" y="228" text-anchor="middle" font-size="15" fill="#1f2340">a folded chain of</text>
+  <text x="612" y="248" text-anchor="middle" font-size="15" fill="#1f2340">amino-acid beads</text>
+
+  <!-- ANALOGY STRIP -->
+  <rect x="30" y="286" width="660" height="158" rx="12" fill="#ffffff" stroke="#e9ecff"/>
+  <text x="360" y="318" text-anchor="middle" font-size="18" font-weight="700" fill="#1f2340">Change one letter, change the meaning</text>
+
+  <g font-size="30" font-weight="700" text-anchor="middle" font-family="'Segoe UI', system-ui, sans-serif">
+    <!-- CAT -->
+    <rect x="150" y="338" width="46" height="52" rx="7" fill="#eef0ff" stroke="#1f2340" stroke-width="4"/><text x="173" y="374" fill="#1f2340">C</text>
+    <rect x="200" y="338" width="46" height="52" rx="7" fill="#ffffff" stroke="#c7cbe6" stroke-width="2"/><text x="223" y="374" fill="#1f2340">A</text>
+    <rect x="250" y="338" width="46" height="52" rx="7" fill="#ffffff" stroke="#c7cbe6" stroke-width="2"/><text x="273" y="374" fill="#1f2340">T</text>
+    <!-- BAT -->
+    <rect x="424" y="338" width="46" height="52" rx="7" fill="#eef0ff" stroke="#1f2340" stroke-width="4"/><text x="447" y="374" fill="#1f2340">B</text>
+    <rect x="474" y="338" width="46" height="52" rx="7" fill="#ffffff" stroke="#c7cbe6" stroke-width="2"/><text x="497" y="374" fill="#1f2340">A</text>
+    <rect x="524" y="338" width="46" height="52" rx="7" fill="#ffffff" stroke="#c7cbe6" stroke-width="2"/><text x="547" y="374" fill="#1f2340">T</text>
+  </g>
+  <line x1="320" y1="364" x2="410" y2="364" stroke="#1f2340" stroke-width="3" marker-end="url(#ge_arrow)"/>
+  <text x="173" y="332" text-anchor="middle" font-size="12" font-weight="700" fill="#4f46e5">changed</text>
+  <text x="447" y="332" text-anchor="middle" font-size="12" font-weight="700" fill="#4f46e5">changed</text>
+  <text x="360" y="424" text-anchor="middle" font-size="14" fill="#1f2340">One changed DNA letter can change the protein &#8212; just like CAT becomes BAT.</text>
+</svg>
+'''
+
+def render_gene_explainer():
+    """Reusable DNA -> gene -> protein visual (M3).
+
+    Rendered as a base64 data-URI <img> so Streamlit's HTML sanitizer can't strip the
+    inline SVG, and so it scales responsively (width:100%, height auto) on mobile.
+    No external dependencies.
+    """
+    b64 = base64.b64encode(GENE_EXPLAINER_SVG.strip().encode("utf-8")).decode("ascii")
+    st.markdown(
+        f'<img alt="Diagram: DNA becomes a gene which builds a protein; changing one '
+        f'DNA letter can change the protein, like CAT to BAT." '
+        f'src="data:image/svg+xml;base64,{b64}" '
+        f'style="display:block;max-width:720px;width:100%;height:auto;margin:0.25rem auto 0.5rem;"/>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "How it fits together: your **DNA** is a long set of instructions. A **gene** "
+        "is a section of that DNA that tells the body how to build a **protein**. "
+        "Changing a single DNA letter can change the protein — like turning CAT into BAT. "
+        "Not every change alters the protein, and some changes affect more than one letter. "
+        "Educational only — not medical advice."
+    )
+
+
+# ----------------------------
 # Pages
 # ----------------------------
 def render_home():
     st.title("🧬 Gene Variant Explorer")
     st.markdown("<div class='smallmuted'>A student-built tool to make genetics understandable using real public scientific data.</div>", unsafe_allow_html=True)
+
+    # Visual explainer: DNA -> gene -> protein (M3)
+    render_gene_explainer()
 
     # Add quick start guide
     with st.expander("Quick Start Guide (First Time Users)", expanded=True):
@@ -482,6 +592,11 @@ def render_home():
 
 def render_about():
     st.title("About")
+
+    # Visual explainer: DNA -> gene -> protein (M3)
+    st.markdown("### The big picture: DNA → gene → protein")
+    render_gene_explainer()
+
     st.markdown("""
 ### Purpose
 Genetics information is often written for professionals and can be confusing for people with little background in genetics. This app helps students and families explore variant evidence responsibly.
@@ -536,7 +651,11 @@ Genetics information is often written for professionals and can be confusing for
 - That's why this variant might be "Pathogenic" (disease-causing)
 
 ### Glossary
+- **DNA**: The molecule that stores life's instructions, written with four "letters" (bases): A, T, G, and C.
+- **Chromosome**: A tightly packaged bundle of DNA. Humans have 23 pairs; each chromosome carries many genes.
 - **Gene**: A section of DNA that contains instructions for making a protein. Genes are like recipes in a cookbook.
+- **Protein**: The molecular "worker" a gene builds. Proteins do most of the jobs in your cells (repairing DNA, carrying oxygen, and more).
+- **Amino acid**: The building blocks that link together to form a protein — like beads on a string.
 - **Variant**: A change in the DNA sequence. Like a typo in a recipe - sometimes it matters, sometimes it doesn't.
 - **Pathogenic**: A variant that causes disease. Think of it as a 'broken' gene that doesn't work correctly.
 - **Benign**: A variant that does NOT cause disease. The gene still works fine despite the change.
